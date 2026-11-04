@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m cole:*)",
+      "Bash(python -m cole:*)",
+      "Bash(python3 -m unittest:*)",
+      "Bash(python3 web/build.py)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Read(./config.json)",
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  }
+}
