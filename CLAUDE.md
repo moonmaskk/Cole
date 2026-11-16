@@ -23,3 +23,4 @@ Krypto-Analyse- und Paper-Trading-Bot. Sprache für Nutzer-Texte: Deutsch.
 - `beats/src/*.py` Piano-Roll-Skripte, `core.py` wird beim Bauen in jedes eingefügt. Nach Änderungen `python3 beats/build.py` → `beats/dist/`.
 - `beats/tools/cole_beats.py` Pack-Sortierer, Suche, Tonart-Helfer (stdlib).
 - Tests: `python3 -m unittest discover -s beats/tests` (flpianoroll wird gefakt).
+- `beats/web/studio.html` Handy-Studio (Aufnahme + Autotune im Browser, Versand über Cloud-Ordner). `beats/build.py` kopiert nach `docs/studio.html`.

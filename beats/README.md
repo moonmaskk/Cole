@@ -8,6 +8,7 @@ Werkzeugkasten, mit dem du in FL Studio in **5 Minuten** einen Beat hast, oder d
 | **Pack-Sortierer** | ZIPs/Ordner von Drumkits auf eine Datei ziehen → alles landet sortiert (Kicks, Snares, 808s, Loops mit BPM/Tonart …) |
 | **Sound-Suche** | `suche dark 808`, `suche piano --key Am --bpm 140` |
 | **Tonart-Helfer** | Zeigt dir, was du in Autotune/Pitcher einstellen musst |
+| **Handy-Studio** | Vocals am Handy aufnehmen, Autotune drauf, über Cloud-Ordner in FL. FL muss nicht laufen → [Anleitung](docs/handy-studio.md) |
 | **Anleitungen** | [Song in 5 Minuten](docs/song-in-5-minuten.md) · [Sampling](docs/sampling.md) · [Autotune](docs/autotune.md) |
 
 Ehrlich gesagt: FL Studio erlaubt keine Mods, die die Oberfläche umbauen. Was offiziell geht, und was das hier nutzt: **Piano-Roll-Skripte** (Python, laufen direkt in FL) plus Hilfsprogramme außerhalb von FL.
@@ -67,3 +68,4 @@ Loops werden beim Sortieren mit Tempo und Tonart vorne im Namen abgelegt, z. B. 
 
 - Quellcode der Skripte: `src/` (gemeinsamer Kern in `src/core.py`). Nach Änderungen: `python3 build.py` → `dist/`.
 - Tests ohne FL Studio: `python3 -m unittest discover -s beats/tests`
+- Handy-Studio: `web/studio.html` (eine Datei). `build.py` kopiert sie nach `../docs/studio.html` (GitHub Pages). Autotune-Test im Browser: `node beats/tests/studio_dsp_test.js beats/web/studio.html`

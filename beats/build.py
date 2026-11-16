@@ -3,6 +3,7 @@
     python3 beats/build.py
 """
 import os
+import shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'src')
@@ -29,6 +30,11 @@ def main():
         with open(path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(text)
         print('gebaut:', os.path.relpath(path, HERE))
+    # Handy-Studio fuer GitHub Pages (docs/studio.html)
+    docs = os.path.join(os.path.dirname(HERE), 'docs')
+    if os.path.isdir(docs):
+        shutil.copy(os.path.join(HERE, 'web', 'studio.html'), os.path.join(docs, 'studio.html'))
+        print('gebaut: ../docs/studio.html')
 
 
 if __name__ == '__main__':

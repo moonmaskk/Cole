@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14181b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cole Studio">
+<title>Cole Studio</title>
+<style>
+:root{--bg:#14181b;--card:#1f2529;--line:#323b41;--text:#e4eaed;--muted:#93a1a9;--accent:#7ec46a;--accent2:#4f8a3e;--rec:#e2504c;--warn:#f0a04b}
+:root[data-theme="light"]{--bg:#f2f4f5;--card:#fff;--line:#d9dfe2;--text:#1b2126;--muted:#5d6b73;--accent:#3f8a2e;--accent2:#2f6b22}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 24px)}
+main{max-width:560px;margin:0 auto;padding:0 16px}
+header{padding:20px 0 8px}
+h1{font-size:26px;margin:0}h1 span{color:var(--accent)}
+header p{margin:4px 0 0;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0}
+h2{font-size:17px;margin:0 0 12px}
+label{display:block;color:var(--muted);font-size:14px;margin:10px 0 4px}
+select,input[type=number]{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px;font-size:16px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.grid3 label{margin-top:0}
+.file{display:flex;align-items:center;justify-content:center;gap:8px;border:2px dashed var(--line);border-radius:12px;padding:16px;color:var(--text);font-weight:600;cursor:pointer;margin:0}
+.file input{display:none}
+.muted{color:var(--muted);font-size:14px;margin-top:8px}
+.hint{background:#f0a04b1f;border:1px solid #f0a04b55;color:var(--text);border-radius:10px;padding:8px 12px;font-size:14px;margin:0 0 14px}
+.recwrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.rec-btn{width:112px;height:112px;border-radius:50%;border:6px solid #e2504c55;background:var(--rec);color:#fff;font-size:20px;font-weight:700;cursor:pointer;box-shadow:0 6px 24px #e2504c44;transition:transform .1s}
+.rec-btn:active{transform:scale(.96)}
+.rec-btn.on{animation:pulse 1.2s infinite;border-radius:28px}
+@keyframes pulse{50%{box-shadow:0 0 0 14px #e2504c22}}
+#recState{font-weight:600;font-variant-numeric:tabular-nums}
+#meter{width:100%;height:14px;border-radius:7px;background:var(--bg)}
+details{margin-top:12px}summary{color:var(--muted);cursor:pointer}
+.chk{display:flex;gap:8px;align-items:center;color:var(--text)}
+.take{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.take .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.take b{font-size:15px}.take small{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button.b{flex:1 1 auto;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:15px;font-weight:600;padding:8px 12px;cursor:pointer}
+button.b.go{background:var(--accent2);border-color:var(--accent);color:#fff}
+button.b.del{flex:0 0 auto;color:var(--muted)}
+button.b:disabled{opacity:.5}
+ol{padding-left:20px;margin:0}ol li{margin:6px 0}
+.empty{color:var(--muted);text-align:center;padding:10px 0}
+footer{color:var(--muted);font-size:13px;text-align:center;margin-top:18px}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Cole <span>Studio</span></h1>
+  <p>Vocals am Handy aufnehmen, Autotune drauf, ab in FL Studio. Läuft auch, wenn der PC aus ist.</p>
+</header>
+
+<section class="card">
+  <h2>1 · Beat</h2>
+  <label class="file">🎵 Beat laden (MP3/WAV aus FL exportiert)<input type="file" id="beatFile" accept="audio/*"></label>
+  <div id="beatInfo" class="muted">Kein Beat geladen. Dann läuft ein Klick im Tempo.</div>
+  <div class="grid3" style="margin-top:12px">
+    <label>Tonart<select id="key"></select></label>
+    <label>Skala<select id="scale"><option value="min">Moll</option><option value="maj">Dur</option></select></label>
+    <label>BPM<input id="bpm" type="number" value="140" min="50" max="220" inputmode="numeric"></label>
+  </div>
+  <label>Beat-Lautstärke im Kopfhörer</label>
+  <input type="range" id="beatVol" min="0" max="1" step="0.01" value="0.7">
+</section>
+
+<section class="card">
+  <h2>2 · Aufnehmen</h2>
+  <p class="hint">🎧 Kopfhörer auf, sonst nimmt das Mikro den Beat mit auf.</p>
+  <div class="recwrap">
+    <button id="recBtn" class="rec-btn">REC</button>
+    <div id="recState">Bereit</div>
+    <canvas id="meter" width="520" height="14"></canvas>
+  </div>
+  <details>
+    <summary>Feineinstellung</summary>
+    <label>Vorzähler</label>
+    <select id="countIn"><option value="1">1 Takt</option><option value="2">2 Takte</option><option value="0">aus</option></select>
+    <label>Latenz-Ausgleich: <span id="latVal"></span> ms (Vocals zu spät? Regler hoch)</label>
+    <input type="range" id="lat" min="0" max="400" step="5" value="120">
+  </details>
+</section>
+
+<section class="card">
+  <h2>3 · Takes</h2>
+  <div id="takes"><div class="empty">Noch keine Aufnahme.</div></div>
+</section>
+
+<section class="card">
+  <h2>So landet es in FL Studio</h2>
+  <ol>
+    <li>Bei einem Take auf <b>Senden</b> tippen → <b>Google Drive</b>, <b>Dropbox</b> oder <b>OneDrive</b> → Ordner <b>„Cole Inbox“</b>.</li>
+    <li>Der PC lädt den Ordner automatisch, sobald er an ist. FL Studio muss dafür nicht laufen.</li>
+    <li>Beim nächsten Start von FL liegt der Take im Browser unter <b>Cole Inbox</b>. Auf Takt 1 ziehen, er sitzt genau auf dem Beat.</li>
+  </ol>
+  <p class="muted">Du bekommst immer zwei Dateien: <b>Original</b> (trocken) und <b>Autotune</b>. In FL kannst du das Original mit Pitcher noch feiner tunen.</p>
+</section>
+<footer>Cole Studio · Aufnahmen bleiben auf deinem Handy, bis du sie selbst sendest.</footer>
+</main>
+
+<script>
+'use strict';
+const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const SCALES = {min:[0,2,3,5,7,8,10], maj:[0,2,4,5,7,9,11]};
+const PRESETS = {
+  hard:    {label:'Hart (Trap)',      tau:0,   amount:1,   verb:0.12},
+  melo:    {label:'Melodisch',        tau:30,  amount:1,   verb:0.15},
+  natural: {label:'Natürlich',        tau:90,  amount:0.75,verb:0.12},
+  off:     {label:'Aus (nur Klang)',  tau:0,   amount:0,   verb:0.12},
+};
+
+/* ================= DSP ================= */
+const ColeDSP = (() => {
+  // Tonhoehe per McLeod-NSDF auf halbierter Abtastrate
+  function decimate(x) {
+    const y = new Float32Array(x.length >> 1);
+    for (let i = 0; i < y.length; i++) y[i] = 0.5 * (x[2*i] + x[2*i+1]);
+    return y;
+  }
+  function detect(x, start, size, sr, fmin = 70, fmax = 1000) {
+    if (start + size > x.length) return 0;
+    let e = 0;
+    for (let i = 0; i < size; i++) e += x[start+i] * x[start+i];
+    if (e / size < 1e-5) return 0;            // zu leise = Pause
+    const minLag = Math.max(2, Math.floor(sr / fmax)), maxLag = Math.min(size - 2, Math.ceil(sr / fmin));
+    const nsdf = new Float32Array(maxLag + 2);
+    for (let lag = minLag; lag <= maxLag + 1; lag++) {
+      let acf = 0, m = 0;
+      for (let i = 0; i < size - lag; i++) {
+        const a = x[start+i], b = x[start+i+lag];
+        acf += a * b; m += a * a + b * b;
+      }
+      nsdf[lag] = m > 0 ? 2 * acf / m : 0;
+    }
+    // Maxima zwischen positiven Nulldurchgaengen
+    let peaks = [], lag = minLag;
+    while (lag <= maxLag && nsdf[lag] > 0) lag++;
+    while (lag <= maxLag) {
+      while (lag <= maxLag && nsdf[lag] <= 0) lag++;
+      let best = -1, bl = 0;
+      while (lag <= maxLag && nsdf[lag] > 0) { if (nsdf[lag] > best) { best = nsdf[lag]; bl = lag; } lag++; }
+      if (bl) peaks.push([bl, best]);
+    }
+    if (!peaks.length) return 0;
+    const top = Math.max(...peaks.map(p => p[1]));
+    if (top < 0.6) return 0;                  // nicht tonal (z. B. "s", "t")
+    const [pl] = peaks.find(p => p[1] >= 0.88 * top);
+    const a = nsdf[pl-1], b = nsdf[pl], c = nsdf[pl+1];
+    const d = a - 2*b + c, shift = d ? 0.5 * (a - c) / d : 0;
+    return sr / (pl + shift);
+  }
+  function pitchTrack(x, sr, hop) {
+    const xd = decimate(x), srd = sr / 2, size = 1024;
+    const n = Math.ceil(x.length / hop), f = new Float32Array(n);
+    for (let k = 0; k < n; k++) f[k] = detect(xd, Math.min(xd.length - size, Math.max(0, Math.floor(k * hop / 2) - size / 2)), size, srd);
+    // Median aus 3 gegen Ausreisser
+    const g = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      const w = [f[Math.max(0,k-1)], f[k], f[Math.min(n-1,k+1)]].sort((p,q)=>p-q);
+      g[k] = f[k] > 0 ? (w[1] > 0 ? w[1] : f[k]) : 0;
+    }
+    return g;
+  }
+  function snap(midi, key, scale) {
+    const set = SCALES[scale].map(s => (s + key) % 12);
+    let best = Math.round(midi), bd = 99;
+    for (let m = Math.floor(midi) - 2; m <= Math.ceil(midi) + 2; m++) {
+      if (set.includes(((m % 12) + 12) % 12) && Math.abs(m - midi) < bd) { bd = Math.abs(m - midi); best = m; }
+    }
+    return best;
+  }
+  function ratios(f0, sr, hop, key, scale, preset) {
+    const r = new Float32Array(f0.length);
+    const alpha = preset.tau ? 1 - Math.exp(-hop / sr / (preset.tau / 1000)) : 1;
+    let corr = 0;
+    for (let k = 0; k < f0.length; k++) {
+      if (f0[k] <= 0 || !preset.amount) { r[k] = 1; continue; }
+      const midi = 69 + 12 * Math.log2(f0[k] / 440);
+      const c = snap(midi, key, scale) - midi;
+      corr += (c - corr) * alpha;
+      r[k] = Math.pow(2, preset.amount * corr / 12);
+    }
+    return r;
+  }
+  // TD-PSOLA: verschiebt die Tonhoehe, Klangfarbe und Laenge bleiben
+  function psola(x, sr, hop, f0, ratio) {
+    const N = x.length, y = new Float32Array(N), w = new Float32Array(N);
+    const fr = t => Math.min(f0.length - 1, Math.floor(t / hop));
+    const marks = [];
+    let t = 0;
+    while (t < N) {
+      const k = fr(t), f = f0[k];
+      const T = Math.round(f > 0 ? sr / f : sr / 200);
+      let tm = t;
+      if (f > 0) {
+        const r = Math.floor(T / 4);
+        let bv = -Infinity;
+        for (let i = Math.max(0, t - r); i < Math.min(N, t + r); i++) if (x[i] > bv) { bv = x[i]; tm = i; }
+      }
+      marks.push([tm, T, f > 0 ? ratio[k] : 1]);
+      t = tm + Math.max(16, T);
+    }
+    if (!marks.length) return y;
+    let ts = marks[0][0], j = 0;
+    while (ts < N) {
+      while (j < marks.length - 1 && Math.abs(marks[j+1][0] - ts) <= Math.abs(marks[j][0] - ts)) j++;
+      const [mt, T, r] = marks[j], d0 = Math.round(ts);
+      for (let i = -T; i < T; i++) {
+        const s = mt + i, d = d0 + i;
+        if (s < 0 || s >= N || d < 0 || d >= N) continue;
+        const win = 0.5 - 0.5 * Math.cos(Math.PI * (i + T) / T);
+        y[d] += x[s] * win; w[d] += win;
+      }
+      ts += T / r;
+    }
+    for (let i = 0; i < N; i++) y[i] = y[i] / Math.max(w[i], 0.35);
+    return y;
+  }
+  function autotune(x, sr, key, scale, preset) {
+    if (!preset.amount) return Float32Array.from(x);
+    const hop = 512 * Math.max(1, Math.round(sr / 44100));
+    const f0 = pitchTrack(x, sr, hop);
+    return psola(x, sr, hop, f0, ratios(f0, sr, hop, key, scale, preset));
+  }
+  function impulse(ctx, sec) {
+    const n = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = b.getChannelData(c);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2);
+    }
+    return b;
+  }
+  // Vocal-Kette: Low-Cut, Praesenz, Kompressor, etwas Hall
+  async function chain(x, sr, preset) {
+    const ctx = new OfflineAudioContext(2, x.length + Math.floor(sr * 1.2), sr);
+    const buf = ctx.createBuffer(1, x.length, sr); buf.copyToChannel(x, 0);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 95;
+    const pr = ctx.createBiquadFilter(); pr.type = 'peaking'; pr.frequency.value = 4000; pr.gain.value = 3; pr.Q.value = 0.8;
+    const air = ctx.createBiquadFilter(); air.type = 'highshelf'; air.frequency.value = 10000; air.gain.value = 2;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -22; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.12; comp.knee.value = 6;
+    const dry = ctx.createGain(), wet = ctx.createGain(), verb = ctx.createConvolver();
+    verb.buffer = impulse(ctx, 1.6); wet.gain.value = preset.verb;
+    src.connect(hp); hp.connect(pr); pr.connect(air); air.connect(comp);
+    comp.connect(dry); dry.connect(ctx.destination);
+    comp.connect(verb); verb.connect(wet); wet.connect(ctx.destination);
+    src.start();
+    const out = await ctx.startRendering();
+    let peak = 0;
+    for (let c = 0; c < out.numberOfChannels; c++) for (const v of out.getChannelData(c)) peak = Math.max(peak, Math.abs(v));
+    const g = peak > 0 ? 0.89 / peak : 1;   // auf -1 dB
+    for (let c = 0; c < out.numberOfChannels; c++) { const d = out.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] *= g; }
+    return out;
+  }
+  function wav(channels, sr) {
+    const nc = channels.length, n = channels[0].length, buf = new ArrayBuffer(44 + n * nc * 2), v = new DataView(buf);
+    const s = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+    s(0,'RIFF'); v.setUint32(4, 36 + n*nc*2, true); s(8,'WAVE'); s(12,'fmt ');
+    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,nc,true); v.setUint32(24,sr,true);
+    v.setUint32(28,sr*nc*2,true); v.setUint16(32,nc*2,true); v.setUint16(34,16,true); s(36,'data'); v.setUint32(40,n*nc*2,true);
+    let o = 44;
+    for (let i = 0; i < n; i++) for (let c = 0; c < nc; c++) {
+      const x = Math.max(-1, Math.min(1, channels[c][i])); v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7fff, true); o += 2;
+    }
+    return new Blob([buf], {type:'audio/wav'});
+  }
+  return {detect, pitchTrack, snap, autotune, chain, wav};
+})();
+window.ColeDSP = ColeDSP;
+
+/* ================= Speicher (bleibt auf dem Handy) ================= */
+const Store = (() => {
+  let dbp = null;
+  function db() {
+    if (!dbp) dbp = new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open('cole-studio', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('takes', {keyPath:'id'});
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    });
+    return dbp;
+  }
+  async function tx(mode, fn) {
+    try {
+      const d = await db();
+      return await new Promise((res, rej) => {
+        const t = d.transaction('takes', mode), st = t.objectStore('takes'), r = fn(st);
+        t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error);
+      });
+    } catch (e) { return null; }
+  }
+  return {
+    all: () => tx('readonly', s => s.getAll()),
+    put: take => tx('readwrite', s => s.put({...take, dry: take.dry.buffer.slice(0), tuned: undefined})),
+    del: id => tx('readwrite', s => s.delete(id)),
+  };
+})();
+
+/* ================= App ================= */
+const $ = id => document.getElementById(id);
+const S = {ac:null, beat:null, beatName:'', takes:[], rec:null, playing:null};
+NOTES.forEach((n, i) => $('key').add(new Option(n, i)));
+$('key').value = 9;
+try {
+  const saved = JSON.parse(localStorage.getItem('cole-studio') || '{}');
+  for (const k of ['key','scale','bpm','lat','countIn','beatVol']) if (saved[k] != null) $(k).value = saved[k];
+} catch (e) {}
+function saveSettings() {
+  try { localStorage.setItem('cole-studio', JSON.stringify(Object.fromEntries(['key','scale','bpm','lat','countIn','beatVol'].map(k => [k, $(k).value])))); } catch (e) {}
+}
+document.querySelectorAll('select,input').forEach(el => el.addEventListener('change', saveSettings));
+const latLabel = () => $('latVal').textContent = $('lat').value;
+$('lat').addEventListener('input', latLabel); latLabel();
+
+function ctx() {
+  if (!S.ac) S.ac = new (window.AudioContext || window.webkitAudioContext)();
+  return S.ac;
+}
+const keyName = (k = +$('key').value, sc = $('scale').value) => NOTES[k] + (sc === 'min' ? 'm' : '');
+
+$('beatFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  $('beatInfo').textContent = 'Lade …';
+  try {
+    const ac = ctx();
+    const data = await f.arrayBuffer();
+    S.beat = await new Promise((res, rej) => ac.decodeAudioData(data, res, rej));
+    S.beatName = f.name.replace(/\.[^.]+$/, '');
+    const m = f.name.match(/(\d{2,3})\s*bpm/i); if (m) $('bpm').value = m[1];
+    $('beatInfo').textContent = '✓ ' + S.beatName + ' · ' + S.beat.duration.toFixed(0) + ' s';
+  } catch (err) { $('beatInfo').textContent = 'Datei konnte nicht gelesen werden.'; S.beat = null; }
+});
+
+function click(ac, when, accent, dest) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.value = accent ? 1500 : 1000;
+  g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(0.5, when + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
+  o.connect(g); g.connect(dest); o.start(when); o.stop(when + 0.08);
+  return o;
+}
+
+// Beat (oder Klick) ab Zeitpunkt "when" abspielen, gibt Stopp-Funktion zurueck
+function playBacking(ac, when, withCountIn, maxSec) {
+  const out = ac.createGain(); out.gain.value = +$('beatVol').value; out.connect(ac.destination);
+  const spb = 60 / +$('bpm').value, nodes = [];
+  const ci = withCountIn ? +$('countIn').value * 4 : 0;
+  for (let i = 0; i < ci; i++) nodes.push(click(ac, when + i * spb, i % 4 === 0, out));
+  const start = when + ci * spb;
+  if (S.beat) {
+    const b = ac.createBufferSource(); b.buffer = S.beat; b.loop = S.beat.duration < 30;
+    b.connect(out); b.start(start); nodes.push(b);
+  } else {
+    for (let i = 0; i < Math.ceil(maxSec / spb); i++) nodes.push(click(ac, start + i * spb, i % 4 === 0, out));
+  }
+  return {start, stop: () => { nodes.forEach(n => { try { n.stop(); } catch (e) {} }); out.disconnect(); }};
+}
+
+let meterLevel = 0;
+function drawMeter() {
+  const c = $('meter'), g = c.getContext('2d');
+  g.clearRect(0, 0, c.width, c.height);
+  const lvl = Math.min(1, meterLevel * 3);
+  g.fillStyle = lvl > 0.9 ? '#e2504c' : '#7ec46a';
+  g.fillRect(0, 0, c.width * lvl, c.height);
+  meterLevel *= 0.9;
+  if (S.rec) {
+    const t = S.ac.currentTime - S.rec.backing.start;
+    $('recState').textContent = t < 0 ? 'Vorzähler … ' + Math.ceil(-t / (60 / +$('bpm').value)) : '● Aufnahme ' + fmt(t);
+  }
+  requestAnimationFrame(drawMeter);
+}
+requestAnimationFrame(drawMeter);
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+async function startRec() {
+  stopPlayback();
+  const ac = ctx(); await ac.resume();
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:1}});
+  } catch (e) {
+    $('recState').textContent = 'Kein Mikrofon-Zugriff. In den Browser-Einstellungen erlauben.'; return;
+  }
+  const src = ac.createMediaStreamSource(stream);
+  const proc = ac.createScriptProcessor(4096, 1, 1), mute = ac.createGain(); mute.gain.value = 0;
+  const rec = {stream, src, proc, mute, chunks:[], firstTime:null};
+  proc.onaudioprocess = e => {
+    const d = e.inputBuffer.getChannelData(0);
+    let s = 0; for (let i = 0; i < d.length; i += 8) s = Math.max(s, Math.abs(d[i]));
+    meterLevel = Math.max(meterLevel, s);
+    if (rec.firstTime === null) rec.firstTime = e.playbackTime - d.length / ac.sampleRate;
+    rec.chunks.push(new Float32Array(d));
+  };
+  src.connect(proc); proc.connect(mute); mute.connect(ac.destination);
+  rec.backing = playBacking(ac, ac.currentTime + 0.25, true, 600);
+  S.rec = rec;
+  $('recBtn').classList.add('on'); $('recBtn').textContent = 'STOP';
+}
+
+async function stopRec() {
+  const rec = S.rec, ac = S.ac; S.rec = null;
+  rec.backing.stop(); rec.proc.disconnect(); rec.src.disconnect(); rec.stream.getTracks().forEach(t => t.stop());
+  $('recBtn').classList.remove('on'); $('recBtn').textContent = 'REC';
+  const sr = ac.sampleRate, total = rec.chunks.reduce((a, c) => a + c.length, 0);
+  const all = new Float32Array(total); let o = 0; for (const c of rec.chunks) { all.set(c, o); o += c.length; }
+  // Auf Beat-Start zuschneiden, damit der Take in FL auf Takt 1 sitzt
+  const off = Math.max(0, Math.round(((rec.backing.start - (rec.firstTime ?? rec.backing.start)) + +$('lat').value / 1000) * sr));
+  const dry = all.slice(off);
+  if (dry.length < sr * 0.5) { $('recState').textContent = 'Zu kurz, nochmal.'; return; }
+  const n = S.takes.length ? Math.max(...S.takes.map(t => t.num)) + 1 : 1;
+  const take = {id: Date.now() + '', num: n, sr, dry, key: +$('key').value, scale: $('scale').value, bpm: +$('bpm').value,
+                beat: S.beatName, preset: 'hard', created: Date.now()};
+  S.takes.unshift(take); Store.put(take);
+  $('recState').textContent = '✓ Take ' + n + ' gespeichert (' + fmt(dry.length / sr) + ')';
+  renderTakes();
+}
+$('recBtn').addEventListener('click', () => S.rec ? stopRec() : startRec());
+
+function baseName(t) { return `[${t.bpm} ${keyName(t.key, t.scale)}] Vocal Take ${t.num}`; }
+
+async function tuned(t) {
+  if (t.tuned && t.tunedPreset === t.preset) return t.tuned;
+  const p = PRESETS[t.preset];
+  await new Promise(r => setTimeout(r, 30));
+  const x = ColeDSP.autotune(t.dry, t.sr, t.key, t.scale, p);
+  t.tuned = await ColeDSP.chain(x, t.sr, p); t.tunedPreset = t.preset;
+  return t.tuned;
+}
+
+function stopPlayback() {
+  if (S.playing) { S.playing.forEach(f => f()); S.playing = null; renderTakes(); }
+}
+async function play(t, which, btn) {
+  if (S.playing) { stopPlayback(); return; }
+  const ac = ctx(); await ac.resume();
+  btn.textContent = '… rechne'; btn.disabled = true;
+  let buf;
+  if (which === 'dry') { buf = ac.createBuffer(1, t.dry.length, t.sr); buf.copyToChannel(t.dry, 0); }
+  else buf = await tuned(t);
+  const when = ac.currentTime + 0.1, s = ac.createBufferSource(); s.buffer = buf; s.connect(ac.destination); s.start(when);
+  const back = playBacking(ac, when, false, buf.duration);
+  S.playing = [() => { try { s.stop(); } catch (e) {} }, back.stop];
+  s.onended = () => { if (S.playing) stopPlayback(); };
+  btn.disabled = false; btn.textContent = '■ Stopp';
+}
+
+async function send(t, btn) {
+  btn.disabled = true; btn.textContent = '… rechne';
+  const tb = await tuned(t);
+  const files = [
+    new File([ColeDSP.wav([t.dry], t.sr)], baseName(t) + ' - Original.wav', {type:'audio/wav'}),
+    new File([ColeDSP.wav([tb.getChannelData(0), tb.getChannelData(1)], t.sr)], baseName(t) + ' - Autotune ' + PRESETS[t.preset].label.split(' ')[0] + '.wav', {type:'audio/wav'}),
+  ];
+  btn.disabled = false; btn.textContent = '⬆ Senden';
+  try {
+    if (navigator.canShare && navigator.canShare({files})) {
+      await navigator.share({files, title: baseName(t), text: 'In den Ordner „Cole Inbox“ speichern'});
+      return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  for (const f of files) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+}
+
+function renderTakes() {
+  const box = $('takes');
+  if (!S.takes.length) { box.innerHTML = '<div class="empty">Noch keine Aufnahme.</div>'; return; }
+  box.innerHTML = '';
+  for (const t of S.takes) {
+    const el = document.createElement('div'); el.className = 'take';
+    el.innerHTML = `<div class="top"><b>${baseName(t)}</b><small>${fmt(t.dry.length / t.sr)}</small></div>
+      <label>Autotune</label><select>${Object.entries(PRESETS).map(([k, p]) => `<option value="${k}"${k === t.preset ? ' selected' : ''}>${p.label}</option>`).join('')}</select>
+      <div class="row"><button class="b" data-a="dry">▶ Original</button><button class="b" data-a="tuned">▶ Autotune</button></div>
+      <div class="row"><button class="b go" data-a="send">⬆ Senden</button><button class="b del" data-a="del">🗑</button></div>`;
+    el.querySelector('select').addEventListener('change', e => { t.preset = e.target.value; Store.put(t); });
+    el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      const a = b.dataset.a;
+      if (a === 'dry' || a === 'tuned') play(t, a, b);
+      if (a === 'send') send(t, b);
+      if (a === 'del' && confirm('Take ' + t.num + ' löschen?')) { S.takes = S.takes.filter(x => x !== t); Store.del(t.id); renderTakes(); }
+    }));
+    box.appendChild(el);
+  }
+}
+
+Store.all().then(list => {
+  if (!list) return;
+  S.takes = list.map(t => ({...t, dry: new Float32Array(t.dry)})).sort((a, b) => b.created - a.created);
+  renderTakes();
+});
+</script>
+</body>
+</html>
