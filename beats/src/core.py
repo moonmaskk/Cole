@@ -1,0 +1,126 @@
+# ---- Cole Beats Kern (wird in jedes Skript eingebaut) ----
+
+NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+SCALES = {
+    'Moll': [0, 2, 3, 5, 7, 8, 10],
+    'Dur': [0, 2, 4, 5, 7, 9, 11],
+    'Harmonisch Moll': [0, 2, 3, 5, 7, 8, 11],
+    'Phrygisch (dunkel)': [0, 1, 3, 5, 7, 8, 10],
+    'Dorisch (smooth)': [0, 2, 3, 5, 7, 9, 10],
+}
+SCALE_NAMES = list(SCALES.keys())
+
+# Akkordfolgen als Stufen (0 = Grundton-Akkord). Pro Takt ein Akkord.
+PROGRESSIONS = {
+    'Dark Trap': [0, 5, 6, 4],
+    'Sad / Emotional': [0, 3, 5, 4],
+    'Hoffnung': [5, 6, 0, 0],
+    'Drill': [0, 0, 5, 4],
+    'Hype': [0, 6, 5, 6],
+    'Lo-Fi / Chill': [1, 4, 0, 5],
+    'Afro / Happy': [0, 4, 5, 3],
+    'R&B': [3, 4, 2, 5],
+}
+PROGRESSION_NAMES = list(PROGRESSIONS.keys())
+
+
+class Rng:
+    """Kleiner eigener Zufallsgenerator (gleicher Seed = gleiches Ergebnis)."""
+
+    def __init__(self, seed):
+        self.s = (int(seed) * 2654435761 + 1013904223) & 0xFFFFFFFF or 1
+
+    def random(self):
+        s = self.s
+        s ^= (s << 13) & 0xFFFFFFFF
+        s ^= s >> 17
+        s ^= (s << 5) & 0xFFFFFFFF
+        self.s = s & 0xFFFFFFFF
+        return self.s / 4294967296.0
+
+    def chance(self, p):
+        return self.random() < p
+
+    def randint(self, a, b):
+        return a + int(self.random() * (b - a + 1))
+
+    def choice(self, items):
+        return items[int(self.random() * len(items))]
+
+
+def scale_note(root, scale, degree):
+    n = len(scale)
+    return root + 12 * (degree // n) + scale[degree % n]
+
+
+def chord_notes(root, scale, degree, size=3):
+    return [scale_note(root, scale, degree + 2 * i) for i in range(size)]
+
+
+def voice_lead(prev, chord):
+    """Waehlt die Umkehrung, die am naechsten am vorherigen Akkord liegt."""
+    if not prev:
+        return chord
+    center = sum(prev) / len(prev)
+    best, best_d = chord, None
+    for inv in range(len(chord)):
+        v = sorted(chord[inv:] + [x + 12 for x in chord[:inv]])
+        for shift in (-12, 0, 12):
+            vs = [x + shift for x in v]
+            d = abs(sum(vs) / len(vs) - center)
+            if best_d is None or d < best_d:
+                best, best_d = vs, d
+    return best
+
+
+def progression_roots(key, scale_name, prog_name, bars):
+    scale = SCALES[scale_name]
+    prog = PROGRESSIONS[prog_name]
+    return [(prog[b % len(prog)], scale) for b in range(bars)]
+
+
+def ppq():
+    return flp.score.PPQ
+
+
+def add_note(number, time, length, velocity=0.8, slide=False):
+    if number < 0 or number > 127 or length <= 0:
+        return None
+    n = flp.Note()
+    n.number = int(number)
+    n.time = int(time)
+    n.length = int(length)
+    n.velocity = max(0.05, min(1.0, velocity))
+    if slide:
+        try:
+            n.slide = True
+        except Exception:
+            pass
+    flp.score.addNote(n)
+    return n
+
+
+def clear_score():
+    for i in range(flp.score.noteCount - 1, -1, -1):
+        flp.score.deleteNote(i)
+
+
+def add_common_inputs(form, with_prog=True):
+    form.AddInputCombo('Tonart', NOTE_NAMES, 9)
+    form.AddInputCombo('Skala', SCALE_NAMES, 0)
+    if with_prog:
+        form.AddInputCombo('Stimmung', PROGRESSION_NAMES, 0)
+    form.AddInputCombo('Laenge', ['4 Takte', '8 Takte', '16 Takte'], 0)
+    form.AddInputKnobInt('Variante (Seed)', 1, 1, 999)
+
+
+def common_values(form, with_prog=True):
+    key = form.GetInputValue('Tonart')
+    scale_name = SCALE_NAMES[form.GetInputValue('Skala')]
+    prog_name = PROGRESSION_NAMES[form.GetInputValue('Stimmung')] if with_prog else None
+    bars = [4, 8, 16][form.GetInputValue('Laenge')]
+    seed = form.GetInputValue('Variante (Seed)')
+    return key, scale_name, prog_name, bars, seed
+
+# ---- Ende Kern ----

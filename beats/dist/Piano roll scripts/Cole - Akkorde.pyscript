@@ -1,0 +1,188 @@
+# Cole Beats - automatisch gebaut aus beats/src/akkorde.py, nicht direkt bearbeiten.
+import flpianoroll as flp
+
+# ---- Cole Beats Kern (wird in jedes Skript eingebaut) ----
+
+NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+SCALES = {
+    'Moll': [0, 2, 3, 5, 7, 8, 10],
+    'Dur': [0, 2, 4, 5, 7, 9, 11],
+    'Harmonisch Moll': [0, 2, 3, 5, 7, 8, 11],
+    'Phrygisch (dunkel)': [0, 1, 3, 5, 7, 8, 10],
+    'Dorisch (smooth)': [0, 2, 3, 5, 7, 9, 10],
+}
+SCALE_NAMES = list(SCALES.keys())
+
+# Akkordfolgen als Stufen (0 = Grundton-Akkord). Pro Takt ein Akkord.
+PROGRESSIONS = {
+    'Dark Trap': [0, 5, 6, 4],
+    'Sad / Emotional': [0, 3, 5, 4],
+    'Hoffnung': [5, 6, 0, 0],
+    'Drill': [0, 0, 5, 4],
+    'Hype': [0, 6, 5, 6],
+    'Lo-Fi / Chill': [1, 4, 0, 5],
+    'Afro / Happy': [0, 4, 5, 3],
+    'R&B': [3, 4, 2, 5],
+}
+PROGRESSION_NAMES = list(PROGRESSIONS.keys())
+
+
+class Rng:
+    """Kleiner eigener Zufallsgenerator (gleicher Seed = gleiches Ergebnis)."""
+
+    def __init__(self, seed):
+        self.s = (int(seed) * 2654435761 + 1013904223) & 0xFFFFFFFF or 1
+
+    def random(self):
+        s = self.s
+        s ^= (s << 13) & 0xFFFFFFFF
+        s ^= s >> 17
+        s ^= (s << 5) & 0xFFFFFFFF
+        self.s = s & 0xFFFFFFFF
+        return self.s / 4294967296.0
+
+    def chance(self, p):
+        return self.random() < p
+
+    def randint(self, a, b):
+        return a + int(self.random() * (b - a + 1))
+
+    def choice(self, items):
+        return items[int(self.random() * len(items))]
+
+
+def scale_note(root, scale, degree):
+    n = len(scale)
+    return root + 12 * (degree // n) + scale[degree % n]
+
+
+def chord_notes(root, scale, degree, size=3):
+    return [scale_note(root, scale, degree + 2 * i) for i in range(size)]
+
+
+def voice_lead(prev, chord):
+    """Waehlt die Umkehrung, die am naechsten am vorherigen Akkord liegt."""
+    if not prev:
+        return chord
+    center = sum(prev) / len(prev)
+    best, best_d = chord, None
+    for inv in range(len(chord)):
+        v = sorted(chord[inv:] + [x + 12 for x in chord[:inv]])
+        for shift in (-12, 0, 12):
+            vs = [x + shift for x in v]
+            d = abs(sum(vs) / len(vs) - center)
+            if best_d is None or d < best_d:
+                best, best_d = vs, d
+    return best
+
+
+def progression_roots(key, scale_name, prog_name, bars):
+    scale = SCALES[scale_name]
+    prog = PROGRESSIONS[prog_name]
+    return [(prog[b % len(prog)], scale) for b in range(bars)]
+
+
+def ppq():
+    return flp.score.PPQ
+
+
+def add_note(number, time, length, velocity=0.8, slide=False):
+    if number < 0 or number > 127 or length <= 0:
+        return None
+    n = flp.Note()
+    n.number = int(number)
+    n.time = int(time)
+    n.length = int(length)
+    n.velocity = max(0.05, min(1.0, velocity))
+    if slide:
+        try:
+            n.slide = True
+        except Exception:
+            pass
+    flp.score.addNote(n)
+    return n
+
+
+def clear_score():
+    for i in range(flp.score.noteCount - 1, -1, -1):
+        flp.score.deleteNote(i)
+
+
+def add_common_inputs(form, with_prog=True):
+    form.AddInputCombo('Tonart', NOTE_NAMES, 9)
+    form.AddInputCombo('Skala', SCALE_NAMES, 0)
+    if with_prog:
+        form.AddInputCombo('Stimmung', PROGRESSION_NAMES, 0)
+    form.AddInputCombo('Laenge', ['4 Takte', '8 Takte', '16 Takte'], 0)
+    form.AddInputKnobInt('Variante (Seed)', 1, 1, 999)
+
+
+def common_values(form, with_prog=True):
+    key = form.GetInputValue('Tonart')
+    scale_name = SCALE_NAMES[form.GetInputValue('Skala')]
+    prog_name = PROGRESSION_NAMES[form.GetInputValue('Stimmung')] if with_prog else None
+    bars = [4, 8, 16][form.GetInputValue('Laenge')]
+    seed = form.GetInputValue('Variante (Seed)')
+    return key, scale_name, prog_name, bars, seed
+
+# ---- Ende Kern ----
+
+
+# TITLE: Cole - Akkorde
+# INFO: Fertige Akkordfolge nach Stimmung. Tonart merken - Melodie, 808 und Autotune nutzen dieselbe.
+
+
+def createDialog():
+    form = flp.ScriptDialog('Cole - Akkorde', 'Waehle Tonart + Stimmung. Gleiche Werte in Melodie/808 = passt automatisch zusammen.')
+    add_common_inputs(form)
+    form.AddInputCombo('Klang', ['Normal (3 Toene)', '7er (voller, R&B/Lo-Fi)', 'Weit (Pads)'], 0)
+    form.AddInputCombo('Rhythmus', ['Lang halten', 'Stabs (kurz)', 'Arpeggio', 'Pluck-Muster'], 0)
+    form.AddInputKnobInt('Oktave', 4, 2, 6)
+    form.AddInputCheckbox('Alte Noten loeschen', True)
+    return form
+
+
+def build_chords(key, scale_name, prog_name, bars, seed, klang, rhythm, octave, P):
+    rng = Rng(seed)
+    root = 12 * (octave + 1) + key
+    size = 4 if klang == 1 else 3
+    bar = P * 4
+    prev = None
+    out = []  # (pitch, time, length, velocity)
+    for b, (deg, scale) in enumerate(progression_roots(key, scale_name, prog_name, bars)):
+        ch = voice_lead(prev, chord_notes(root, scale, deg, size))
+        prev = ch
+        voiced = list(ch)
+        if klang == 2:
+            voiced = [ch[0] - 12] + ch[1:] + [ch[0] + 12]
+        t0 = b * bar
+        if rhythm == 0:
+            for p in voiced:
+                out.append((p, t0, bar, 0.72))
+        elif rhythm == 1:
+            pattern = rng.choice([[0, 3, 6, 10, 12], [0, 3, 8, 11], [0, 6, 8, 14], [0, 2, 6, 10]])
+            for step in pattern:
+                for p in voiced:
+                    out.append((p, t0 + step * P // 4, P // 4, 0.8 if step == 0 else 0.65))
+        elif rhythm == 2:
+            seq = voiced + [voiced[-2]] if len(voiced) > 2 else voiced
+            for i in range(8):
+                p = seq[i % len(seq)] + (12 if i >= 4 and rng.chance(0.3) else 0)
+                out.append((p, t0 + i * P // 2, P // 2, 0.7 if i % 2 else 0.85))
+        else:
+            for i in range(16):
+                if i % 4 == 0 or rng.chance(0.35):
+                    p = voiced[rng.randint(0, len(voiced) - 1)]
+                    out.append((p, t0 + i * P // 4, P // 4, 0.75))
+    return out
+
+
+def apply(form):
+    key, scale_name, prog_name, bars, seed = common_values(form)
+    if form.GetInputValue('Alte Noten loeschen'):
+        clear_score()
+    for p, t, l, v in build_chords(key, scale_name, prog_name, bars, seed,
+                                   form.GetInputValue('Klang'), form.GetInputValue('Rhythmus'),
+                                   form.GetInputValue('Oktave'), ppq()):
+        add_note(p, t, l, v)

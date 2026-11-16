@@ -18,3 +18,8 @@ Krypto-Analyse- und Paper-Trading-Bot. Sprache für Nutzer-Texte: Deutsch.
 - `python3 -m unittest discover -s tests`
 - Offline-Lauf: `python3 -m cole paper --source sim --fast --cycles 200 --quiet`
 - Im Cloud-Container sind Börsen-APIs gesperrt; dort nur `--source sim` testen.
+
+## beats/ · FL-Studio-Werkzeug (eigenständig, hat nichts mit dem Krypto-Bot zu tun)
+- `beats/src/*.py` Piano-Roll-Skripte, `core.py` wird beim Bauen in jedes eingefügt. Nach Änderungen `python3 beats/build.py` → `beats/dist/`.
+- `beats/tools/cole_beats.py` Pack-Sortierer, Suche, Tonart-Helfer (stdlib).
+- Tests: `python3 -m unittest discover -s beats/tests` (flpianoroll wird gefakt).
