@@ -30,7 +30,7 @@ def _bar_rhythm(rng, density, style):
 
 def build_melody(key, scale_name, prog_name, bars, seed, style, density, octave, P):
     rng = Rng(seed * 7 + 3)
-    root = 12 * (octave + 1) + key
+    root = root_note(octave, key)
     roots = progression_roots(key, scale_name, prog_name, bars)
     motif_a = _bar_rhythm(rng, density, style)
     motif_b = _bar_rhythm(rng, density, style)

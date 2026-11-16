@@ -52,6 +52,11 @@ class Rng:
         return items[int(self.random() * len(items))]
 
 
+def root_note(octave, key):
+    # Oktaven wie in FL Studio gezaehlt: C5 = MIDI 60
+    return 12 * octave + key
+
+
 def scale_note(root, scale, degree):
     n = len(scale)
     return root + 12 * (degree // n) + scale[degree % n]

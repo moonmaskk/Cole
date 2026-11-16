@@ -23,7 +23,7 @@ PATTERNS_808 = {
 
 def build_808(key, scale_name, prog_name, bars, seed, pattern, slides, octave, P):
     rng = Rng(seed * 13 + 5)
-    root = 12 * (octave + 1) + key
+    root = root_note(octave, key)
     out = []
     choices = PATTERNS_808[pattern]
     bar_pat = [rng.choice(choices) for _ in range(4)]

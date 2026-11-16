@@ -52,6 +52,11 @@ class Rng:
         return items[int(self.random() * len(items))]
 
 
+def root_note(octave, key):
+    # Oktaven wie in FL Studio gezaehlt: C5 = MIDI 60
+    return 12 * octave + key
+
+
 def scale_note(root, scale, degree):
     n = len(scale)
     return root + 12 * (degree // n) + scale[degree % n]
@@ -145,7 +150,7 @@ def createDialog():
 
 def build_chords(key, scale_name, prog_name, bars, seed, klang, rhythm, octave, P):
     rng = Rng(seed)
-    root = 12 * (octave + 1) + key
+    root = root_note(octave, key)
     size = 4 if klang == 1 else 3
     bar = P * 4
     prev = None

@@ -12,6 +12,15 @@ Werkzeugkasten, mit dem du in FL Studio in **5 Minuten** einen Beat hast, oder d
 
 Ehrlich gesagt: FL Studio erlaubt keine Mods, die die Oberfläche umbauen. Was offiziell geht, und was das hier nutzt: **Piano-Roll-Skripte** (Python, laufen direkt in FL) plus Hilfsprogramme außerhalb von FL.
 
+## So sieht's aus
+
+Nachgezeichnete Fenster, aber mit den Noten und Ordnern, die die Skripte wirklich erzeugen:
+
+![Melodie-Skript](docs/bilder/cole-beats-1.png)
+![Drums](docs/bilder/cole-beats-2.png)
+![Ganzer Beat](docs/bilder/cole-beats-3.png)
+![Pack sortieren](docs/bilder/cole-beats-4.png)
+
 ## Einrichten (einmalig, ca. 3 Minuten)
 
 Voraussetzung: FL Studio **21.2 oder neuer** (wegen Piano-Roll-Skripten) und [Python](https://www.python.org/downloads/) (beim Installieren „Add to PATH“ anhaken).

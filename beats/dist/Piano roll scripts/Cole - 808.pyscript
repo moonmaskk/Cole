@@ -52,6 +52,11 @@ class Rng:
         return items[int(self.random() * len(items))]
 
 
+def root_note(octave, key):
+    # Oktaven wie in FL Studio gezaehlt: C5 = MIDI 60
+    return 12 * octave + key
+
+
 def scale_note(root, scale, degree):
     n = len(scale)
     return root + 12 * (degree // n) + scale[degree % n]
@@ -154,7 +159,7 @@ PATTERNS_808 = {
 
 def build_808(key, scale_name, prog_name, bars, seed, pattern, slides, octave, P):
     rng = Rng(seed * 13 + 5)
-    root = 12 * (octave + 1) + key
+    root = root_note(octave, key)
     out = []
     choices = PATTERNS_808[pattern]
     bar_pat = [rng.choice(choices) for _ in range(4)]

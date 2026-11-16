@@ -14,7 +14,7 @@ def createDialog():
 
 def build_chords(key, scale_name, prog_name, bars, seed, klang, rhythm, octave, P):
     rng = Rng(seed)
-    root = 12 * (octave + 1) + key
+    root = root_note(octave, key)
     size = 4 if klang == 1 else 3
     bar = P * 4
     prev = None
