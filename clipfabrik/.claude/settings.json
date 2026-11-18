@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m unittest:*)",
+      "Bash(python3 -m unittest:*)",
+      "Bash(python -m clipfabrik:*)",
+      "Bash(python3 -m clipfabrik:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Read(./data/**)",
+      "Read(./build/**)",
+      "Read(./dist/**)",
+      "Read(./.venv/**)"
+    ]
+  }
+}

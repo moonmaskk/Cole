@@ -1,0 +1,2 @@
+streamlink>=6.7
+imageio-ffmpeg>=0.5

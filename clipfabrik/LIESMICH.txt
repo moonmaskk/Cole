@@ -1,0 +1,15 @@
+ClipFabrik – Kurzanleitung
+==========================
+
+1. ClipFabrik.exe doppelklicken. Windows fragt evtl. "Computer geschützt" ->
+   "Weitere Informationen" -> "Trotzdem ausführen" (die Datei ist nicht signiert).
+2. Der Browser öffnet das Dashboard (http://127.0.0.1:8765).
+3. "Testclip erzeugen" drücken: so siehst du sofort, dass alles läuft.
+4. Unter "Einstellungen" deine Streamer eintragen (einer pro Zeile: login sprache).
+5. Programm laufen lassen. Fertige Clips erscheinen unter "Clips".
+
+Alles liegt im Ordner "data" neben der .exe (Clips, Datenbank, Einstellungen).
+Beenden: das schwarze Fenster schließen.
+
+Untertitel gibt es in der .exe-Version noch nicht (dafür Start-ClipFabrik.bat nutzen).
+Clippe nur Streamer, die Clipping erlauben, und nenne sie als Quelle.
