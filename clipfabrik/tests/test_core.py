@@ -125,5 +125,61 @@ class FeaturePackTest(unittest.TestCase):
         self.assertIsNotNone(p.preview_frame("demo"))
 
 
+class SmartDetectTest(unittest.TestCase):
+    def setUp(self):
+        self.cfg = config.load()
+        random.seed(2)
+
+    def test_classify(self):
+        from clipfabrik.detect import classify
+        self.assertEqual(classify(["KEKW", "LUL", "hahaha", "xD", "ok"]), "lustig")
+        self.assertEqual(classify(["POG", "insane", "clutch 🔥", "W"]), "krass")
+        self.assertEqual(classify(["hallo", "wie gehts", "ok"]), "unklar")
+
+    def test_audio_trigger_with_quiet_chat(self):
+        det = Detector(self.cfg)
+        t0 = 5_000_000.0
+        for i in range(400):                       # 200 s normales Reden um -30 dB
+            det.feed_audio("x", t0 + i * 0.5, -30 + random.uniform(-2, 2))
+        peak = t0 + 200
+        for i in range(8):                         # 4 s Schreien/Lachen
+            det.feed_audio("x", peak + i * 0.5, -12 + random.uniform(-1, 1))
+        trig = det.check_audio("x")
+        self.assertIsNotNone(trig)
+        self.assertEqual(trig.signals["source"], "ton")
+        self.assertEqual(trig.signals["category"], "reaktion")
+        self.assertIsNone(det.check_audio("x"), "Abklingzeit")
+
+    def test_single_bang_no_trigger(self):
+        det = Detector(self.cfg)
+        t0 = 6_000_000.0
+        for i in range(400):
+            det.feed_audio("x", t0 + i * 0.5, -30 + random.uniform(-2, 2))
+        det.feed_audio("x", t0 + 200, -5)          # ein einzelner Knall
+        for i in range(1, 6):
+            det.feed_audio("x", t0 + 200 + i * 0.5, -30)
+        self.assertIsNone(det.check_audio("x"))
+
+    def test_loudness_real_file(self):
+        out = Path(tempfile.mkdtemp()) / "a.ts"
+        media.run(["-f", "lavfi", "-i", "sine=f=300:d=4", "-af", "volume='if(lt(t,2),0.05,0.8)':eval=frame",
+                   "-c:a", "aac", "-f", "mpegts", str(out)])
+        lv = media.loudness(out)
+        self.assertGreaterEqual(len(lv), 7)
+        self.assertGreater(lv[-2] - lv[1], 15)
+
+    def test_learn_factor(self):
+        from clipfabrik import db
+        from clipfabrik.pipeline import Pipeline
+        import json as _j
+        p = Pipeline()
+        for cat, views in [("lustig", 90000)] * 3 + [("fail", 10000)] * 3 + [("krass", 30000)] * 3:
+            cid = db.add_clip("lernen", 1.0, 0.0, 1.0, 6, {"category": cat}, [])
+            db.update(cid, status="POSTED", views=views)
+        self.assertGreater(p.learn_factor("lustig"), 1.0)
+        self.assertLess(p.learn_factor("fail"), 1.0)
+        self.assertEqual(p.learn_factor("wholesome"), 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

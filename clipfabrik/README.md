@@ -27,6 +27,14 @@ Danach öffnet sich das Dashboard im Browser. Drück **„Testclip erzeugen“**
 - **Posting-Plan:** beste Clips zuerst, verteilt auf die Hauptzeiten (Posts pro Tag einstellbar).
 - **KI-Bewertung (optional, kostenlos):** [Ollama](https://ollama.com) installieren, `ollama pull llava`, Modellname in den Einstellungen eintragen. Die KI sortiert Langeweile/Cutscenes aus und schreibt bessere Hooks.
 
+## Schlauere Erkennung
+- **Ton:** Das Programm hört jeden Stream mit. Wird der Streamer mindestens 1,5 s deutlich lauter als sonst (Lachen, Schreien), entsteht ein Clip, auch wenn der Chat ruhig bleibt. Einzelne Knalle zählen nicht.
+- **Clip-Art:** lustig, Fail, krass, Schock, Rage, wholesome, Reaktion – erkannt aus Emotes. Steuert Hook, Hashtags und Anzeige.
+- **Emote-Wände:** Spammen viele dasselbe, zählt das extra.
+- **Lernen:** Mit eingetragenen Views bekommen Clip-Arten, die bei dir gut laufen, bis +30 % Note (schwache bis −30 %).
+
+Grundlage: Fu et al. 2017 (Chat + Video schlägt Chat allein), Ringer et al. 2022 (Audio/Video-Highlights in Livestreams), Gillick et al. 2021 (Lachen in lauter Umgebung erkennbar; optionales Modell für später).
+
 ## 16 Streamer – geht das?
 Ja. Die Aufnahme kostet kaum Rechenleistung, entscheidend ist die **Internetleitung**:
 

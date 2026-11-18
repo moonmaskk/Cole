@@ -147,6 +147,23 @@ def _model(name: str):
 
 # ---------- 9:16 ----------
 
+def loudness(src: Path, step: float = 0.5) -> list[float]:
+    """Lautstärke in dBFS je `step` Sekunden (Mono, 8 kHz reichen dafür)."""
+    import array
+    import math
+    p = subprocess.run([ffmpeg(), "-hide_banner", "-loglevel", "error", "-i", str(src), "-vn", "-ac", "1",
+                        "-ar", "8000", "-f", "s16le", "pipe:1"], capture_output=True, timeout=60,
+                       creationflags=NO_WINDOW)
+    pcm = array.array("h", p.stdout[: len(p.stdout) // 2 * 2])
+    n = int(8000 * step)
+    out = []
+    for i in range(0, len(pcm) - n + 1, n):
+        chunk = pcm[i:i + n]
+        rms = math.sqrt(sum(x * x for x in chunk) / n) if n else 0
+        out.append(20 * math.log10(rms / 32768) if rms > 0 else -90.0)
+    return out
+
+
 def frame(src: Path, out: Path, at: float = 1.0) -> None:
     run(["-ss", f"{at:.2f}", "-i", str(src), "-frames:v", "1", "-vf", "scale=960:-2", str(out)])
 

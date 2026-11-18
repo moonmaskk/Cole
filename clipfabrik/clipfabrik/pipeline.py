@@ -27,6 +27,7 @@ class Pipeline:
         self.chat = ChatClient(self._on_chat, self.log)
         self.last_delivery = 0.0
         self.tg_offset = 0
+        self.audio_done: dict[str, float] = {}
         self.started = time.time()
         db.init()
         db.recover()
@@ -50,6 +51,7 @@ class Pipeline:
         self._spawn("chat", self.chat.run, loop=False)
         self._spawn("manager", self._manage, every=3)
         self._spawn("detector", self._detect_tick, every=1)
+        self._spawn("audio", self._audio_tick, every=2)
         self._spawn("cutter", self._cut_one, every=2)
         self._spawn("judge", self._judge_one, every=2)
         self._spawn("renderer", self._render_one, every=2)
@@ -108,9 +110,36 @@ class Pipeline:
             if trig:
                 self.add_candidate(login, trig)
 
-    def add_candidate(self, login: str, trig, dedupe: bool = True) -> int | None:
+    def _audio_tick(self) -> None:
+        """Neue fertige Puffer-Segmente anhören und Lautstärke in den Detektor geben."""
+        if not self.cfg.get("audio_detection", True):
+            return
+        for login, st in list(self.streamers.items()):
+            if not st.get("recording"):
+                continue
+            segs = media.segments(config.BUFFER / login)[:-1]        # das laufende Segment auslassen
+            last = self.audio_done.get(login, 0.0)
+            for t, path in segs:
+                if t <= last:
+                    continue
+                try:
+                    for i, db_ in enumerate(media.loudness(path)):
+                        self.detector.feed_audio(login, t + i * 0.5, db_)
+                except Exception:
+                    pass
+                self.audio_done[login] = t
+            au = self.detector.audio.get(login)
+            if au and au.samples:
+                st["audio_z"] = au.snapshot(au.samples[-1][0])["audio_z"]
+            trig = self.detector.check_audio(login)
+            if trig:
+                self.add_candidate(login, trig, window=(20, 10))
+
+    def add_candidate(self, login: str, trig, dedupe: bool = True,
+                      window: tuple[float, float] | None = None) -> int | None:
         c = self.cfg
-        start, end = trig.peak - c["pre_seconds"], trig.peak + c["post_seconds"]
+        pre, post = window or (c["pre_seconds"], c["post_seconds"])
+        start, end = trig.peak - pre, trig.peak + post
         if trig.score < 3:
             return None                                   # schwacher Vorab-Score fällt sofort weg
         dup = db.overlapping(login, start, end) if dedupe else None
@@ -121,7 +150,8 @@ class Pipeline:
         cid = db.add_clip(login, trig.peak, start, end, trig.score, trig.signals, trig.chat)
         if login in self.streamers:
             self.streamers[login]["clips"] = self.streamers[login].get("clips", 0) + 1
-        self.log(f"{login}: Moment erkannt (Vorab-Score {trig.score}, z={trig.signals.get('z')})")
+        src = "Ton" if trig.signals.get("source") == "ton" else "Chat"
+        self.log(f"{login}: Moment erkannt über {src} – {trig.signals.get('category', '?')} (Vorab {trig.score})")
         return cid
 
     # ---------- Verarbeitung ----------
@@ -164,6 +194,8 @@ class Pipeline:
                     return
             except Exception as e:
                 self.log(f"KI-Bewertung nicht erreichbar, nutze Chat-Note ({str(e)[:60]})")
+        factor = self.learn_factor(json.loads(clip["signals"] or "{}").get("category", "unklar"))
+        score = round(max(1.0, min(10.0, score * factor)), 1)
         if score < self.cfg["min_score"]:
             db.update(clip["id"], status="REJECTED", score=score, title=title,
                       error=f"unter Mindestnote ({score} < {self.cfg['min_score']})")
@@ -286,6 +318,28 @@ class Pipeline:
         media.frame(src, out, 0.5)
         return out
 
+    def learn_factor(self, category: str) -> float:
+        """Lernen aus deinen Ergebnissen: Clip-Arten mit überdurchschnittlichen Views bekommen bis +30 %."""
+        if not self.cfg.get("learn_from_views", True):
+            return 1.0
+        posted = [(json.loads(c["signals"] or "{}").get("category", "unklar"), c["views"] or 0)
+                  for c in db.all_clips() if c["status"] == "POSTED" and (c["views"] or 0) > 0]
+        mine = sorted(v for k, v in posted if k == category)
+        if len(posted) < 6 or len(mine) < 3:
+            return 1.0
+        allv = sorted(v for _, v in posted)
+        med_all, med_cat = allv[len(allv) // 2], mine[len(mine) // 2]
+        return round(max(0.7, min(1.3, med_cat / med_all)), 2) if med_all else 1.0
+
+    def learning(self) -> list[dict]:
+        out: dict[str, list[int]] = {}
+        for c in db.all_clips():
+            if c["status"] == "POSTED" and (c["views"] or 0) > 0:
+                out.setdefault(json.loads(c["signals"] or "{}").get("category", "unklar"), []).append(c["views"])
+        return sorted(({"category": k, "posts": len(v), "median_views": sorted(v)[len(v) // 2],
+                        "factor": self.learn_factor(k)} for k, v in out.items()),
+                      key=lambda r: r["median_views"], reverse=True)
+
     def money(self) -> dict:
         """Verdienst-Übersicht: geschätzt aus eingetragenen Views × € pro 1000 Views."""
         rows: dict[str, dict] = {}
@@ -351,6 +405,7 @@ class Pipeline:
             "clips": db.recent(60),
             "logs": list(self.logs)[:60],
             "money": self.money(),
+            "learning": self.learning(),
             "facecams": {s["login"]: bool(s.get("facecam")) for s in self.cfg["streamers"]},
             "posts_per_day": self.cfg.get("posts_per_day", 4),
             "uptime": time.time() - self.started,
@@ -392,6 +447,27 @@ class Pipeline:
         return self.add_candidate(login, trig, dedupe=False)
 
 
+CAT_HOOKS = {
+    "de": {
+        "lustig": ["Ich kann nicht mehr 😂", "Warum ist das so lustig", "Der Chat liegt am Boden", "Bester Moment des Streams"],
+        "fail": ["Das ging komplett schief", "Wie kann man nur", "Er hat es fast geschafft …", "Der schlimmste Fail heute"],
+        "krass": ["Was für ein Play", "Das war einfach nur krank", "Niemand macht ihm das nach", "Wie hat er das gemacht?!"],
+        "schock": ["Damit hat keiner gerechnet", "Warte aufs Ende", "Was ist hier passiert?!", "Der ganze Chat so: WTF"],
+        "rage": ["Er rastet komplett aus", "Das war zu viel für ihn", "Bitte nicht noch mal …"],
+        "wholesome": ["Das ist so wholesome", "Bester Moment heute ❤", "Chat ist gerührt"],
+        "reaktion": ["Seine Reaktion 😭", "Hör genau hin", "Er konnte nicht anders"],
+    },
+    "en": {
+        "lustig": ["I can't stop laughing", "Why is this so funny", "Chat is on the floor", "Funniest moment of the stream"],
+        "fail": ["That went horribly wrong", "How do you even do that", "He almost had it …", "Biggest fail today"],
+        "krass": ["What a play", "That was actually insane", "Nobody can do this", "How did he pull that off?!"],
+        "schock": ["Nobody expected this", "Wait for the end", "What just happened?!", "Chat went WTF"],
+        "rage": ["He completely lost it", "That broke him", "Not again …"],
+        "wholesome": ["This is so wholesome", "Best moment today", "Chat is emotional"],
+        "reaktion": ["His reaction 😭", "Listen closely", "He couldn't hold it in"],
+    },
+}
+
 HOOKS = {
     "de": {
         "calls": ["Chat schreit nur noch CLIP", "Das musste geclippt werden", "Chat hat sofort reagiert"],
@@ -411,6 +487,9 @@ HOOKS = {
 def make_title(clip: dict, lang: str = "de") -> str:
     """Wechselnde Hooks je nach Signal und Sprache (gleicher Clip -> gleicher Hook)."""
     sig = json.loads(clip.get("signals") or "{}")
+    cat = CAT_HOOKS.get(lang, CAT_HOOKS["en"]).get(sig.get("category", ""))
+    if cat:
+        return cat[(clip.get("id") or 0) % len(cat)]
     lib = HOOKS.get(lang, HOOKS["en"])
     kind = "calls" if sig.get("clip_calls", 0) >= 3 else "hype" if sig.get("hype", 0) >= 5 else "base"
     options = lib[kind]
@@ -423,6 +502,10 @@ def text_block(clip: dict, st: dict) -> str:
     tags = ["#twitch", f"#{login}", "#clips", "#fyp"]
     if "grand theft auto" in cat.lower() or "gta" in cat.lower():
         tags[2:2] = ["#gta6", "#gta"]
+    kind = json.loads(clip.get("signals") or "{}").get("category", "")
+    extra = {"lustig": ["#funny", "#lustig"], "fail": ["#fail", "#fails"], "krass": ["#insane", "#gaming"],
+             "schock": ["#wtf", "#crazy"], "rage": ["#rage"], "wholesome": ["#wholesome"], "reaktion": ["#reaction"]}
+    tags[2:2] = extra.get(kind, [])
     return (f"🎬 {clip['title']}\n\n"
             f"Titel: {login}: {clip['title']}\n"
             f"Caption: {clip['title']} | Quelle: twitch.tv/{login}\n"

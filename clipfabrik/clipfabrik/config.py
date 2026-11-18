@@ -37,6 +37,9 @@ DEFAULTS: dict = {
     "pre_seconds": 28,          # Chat reagiert verzögert: Clip startet vor dem Ausschlag
     "post_seconds": 6,
     "min_score": 5,             # Mindestnote 1-10
+    "audio_detection": True,    # Ton mithören: Streamer lacht/schreit -> Clip, auch bei ruhigem Chat
+    "audio_z_threshold": 3.5,
+    "learn_from_views": True,   # Clip-Arten mit vielen Views bekommen bessere Noten
     # Ausgabe
     "subtitles": True,          # braucht faster-whisper (optional)
     "whisper_model": "small",

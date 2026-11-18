@@ -124,6 +124,8 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
 @media (max-width:900px){.cols{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,1fr)}
   .modal{grid-template-columns:1fr}.modal video{height:auto;width:100%;max-height:62vh}}
 .cols>div{min-width:0}
+.cat{position:absolute;top:42px;left:10px;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:rgba(0,0,0,.72)}
+.cat.lustig{color:#ffd84d}.cat.fail{color:#ff8a5a}.cat.krass{color:#5af0ff}.cat.schock{color:#ff6bd5}.cat.rage{color:#ff5a5a}.cat.wholesome{color:#ff9ec7}.cat.reaktion{color:#c9b2ff}
 @media (max-width:560px){header{flex-wrap:wrap;padding:12px 16px}nav{order:3;width:100%;margin:0}nav button{flex:1;padding:7px 4px;font-size:13px}.slot time{min-width:70px;font-size:13px}
   main{padding:16px}.two,.three{grid-template-columns:1fr}.grid{grid-template-columns:1fr 1fr}.clips{grid-template-columns:1fr 1fr}
   #chatPill{display:none}}
@@ -181,6 +183,9 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
         <div style="overflow:auto"><table class="t" id="rank"></table></div>
       </div>
       <div>
+        <h2>Was lernt das Programm?</h2>
+        <div style="overflow:auto;margin-bottom:6px"><table class="t" id="learn"></table></div>
+        <div class="hint" style="margin-bottom:6px">Clip-Arten mit mehr Views als üblich bekommen bis zu +30 % Note, schwache bis −30 %. Startet ab 6 Posts mit Views.</div>
         <h2>Posting-Plan</h2>
         <div class="plan" id="plan"></div>
         <div class="hint" style="margin-top:8px">Beste Clips zuerst, verteilt auf die Hauptzeiten. Anzahl pro Tag in den Einstellungen.</div>
@@ -202,7 +207,7 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
       </div>
       <div class="card">
         <h3>Momente erkennen</h3>
-        <p>Ein Clip entsteht, wenn der Chat deutlich schneller schreibt als sonst und genug verschiedene Leute mitmachen, oder wenn mehrere „clip“ rufen.</p>
+        <p>Ein Clip entsteht, wenn der Chat deutlich schneller schreibt als sonst und genug verschiedene Leute mitmachen, wenn mehrere „clip“ rufen, oder wenn der Streamer selbst deutlich lauter wird (Lachen, Schreien). Die Art des Moments (lustig, Fail, krass …) wird aus den Emotes erkannt.</p>
         <div class="three">
           <div><label>z-Schwelle</label><input name="z_threshold" type="number" step="0.5"></div>
           <div><label>Mind. verschiedene Nutzer</label><input name="min_unique_users" type="number"></div>
@@ -213,7 +218,10 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
           <div><label>Abklingzeit (s)</label><input name="cooldown_seconds" type="number"></div>
           <div><label>Puffer (Minuten)</label><input name="buffer_minutes" type="number"></div>
           <div><label>Clips behalten (Tage)</label><input name="keep_clips_days" type="number"></div>
+          <div><label>Ton-Schwelle (z)</label><input name="audio_z_threshold" type="number" step="0.5"></div>
         </div>
+        <label class="check"><input type="checkbox" name="audio_detection"> Ton mithören: Clip, wenn der Streamer lacht, schreit oder ausrastet, auch bei ruhigem Chat</label>
+        <label class="check"><input type="checkbox" name="learn_from_views"> Aus meinen Views lernen</label>
       </div>
       <div class="card">
         <h3>Geld &amp; Wirkung</h3>
@@ -303,6 +311,8 @@ table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px s
 
 <script>
 const $=s=>document.querySelector(s), esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const CAT={lustig:"😂 lustig",fail:"💀 Fail",krass:"🔥 krass",schock:"😳 Schock",rage:"😡 Rage",wholesome:"❤ wholesome",reaktion:"🔊 Reaktion"};
+const sigOf=c=>{try{return JSON.parse(c.signals||"{}")}catch{return{}}};
 const LABEL={NEW:"erkannt",CUT:"geschnitten",JUDGED:"bewertet",RENDERED:"fertig",DELIVERED:"gesendet",POSTED:"gepostet",REJECTED:"verworfen",FAILED:"Fehler"};
 let S=null, filter="alle", openId=null;
 
@@ -321,10 +331,11 @@ function clipCard(c){
   const thumb=ready
     ?`<div class="thumb" style="background-image:url(/thumb/${c.id}.jpg?${c.updated|0})" data-open="${c.id}">
         <span class="sc">${c.score??c.pre_score}</span><span class="badge s stt s-${c.status}">${LABEL[c.status]}</span>
+        ${CAT[sigOf(c).category]?`<span class="cat ${sigOf(c).category}">${CAT[sigOf(c).category]}</span>`:""}
         <div class="play"><i></i></div></div>`
     :`<div class="thumb wait"><span class="badge s stt s-${c.status}">${LABEL[c.status]}</span>${c.status==="REJECTED"||c.status==="FAILED"?"—":"wird verarbeitet …"}</div>`;
   return `<div class="clip">${thumb}
-    <div class="meta"><b>${esc(c.streamer)} · ${esc(c.title||"Moment")}</b><span>${ago(c.created)} · Vorab ${c.pre_score}</span></div>
+    <div class="meta"><b>${esc(c.streamer)} · ${esc(c.title||"Moment")}</b><span>${ago(c.created)} · ${sigOf(c).source==="ton"?"über Ton":"über Chat"} · Vorab ${c.pre_score}</span></div>
     ${c.error?`<div class="err">${esc(c.error)}</div>`:""}
     ${ready?`<div class="acts"><button class="btn p" data-act="posted" data-id="${c.id}">Gepostet</button><button class="btn" data-act="reject" data-id="${c.id}">Weg</button></div>`:""}
   </div>`;
@@ -344,7 +355,7 @@ function render(){
   $("#grid").innerHTML=names.length?names.map(n=>{const s=st[n],z=Math.max(0,Math.min(100,(s.z||0)*12));
     return `<div class="st ${s.recording?"rec":""}"><button class="fc ${S.facecams[n]?"on":""}" data-fc="${esc(n)}">${S.facecams[n]?"Cam ✓":"Cam"}</button><div class="n"><span class="badge ${s.live?"live":""}">${s.live?"LIVE":"OFF"}</span>${esc(n)}</div>
       <div class="c">${esc(s.category||s.status)}</div><div class="meter"><i style="width:${z}%"></i></div>
-      <div class="row"><span>${s.rate||0} Nachr./min</span><span>z ${(s.z||0).toFixed(1)} · ${s.clips||0} Clips</span></div></div>`}).join("")
+      <div class="row"><span>${s.rate||0}/min · 🔊 ${(s.audio_z||0).toFixed(1)}</span><span>z ${(s.z||0).toFixed(1)} · ${s.clips||0} Clips</span></div></div>`}).join("")
     :`<div class="empty">Noch keine Streamer. Trag sie unter <b>Einstellungen</b> ein oder erzeuge rechts einen Testclip.</div>`;
   $("#recent").innerHTML=S.clips.slice(0,8).map(clipCard).join("")||`<div class="empty">Noch keine Clips. Sobald ein Chat ausschlägt, erscheinen sie hier.</div>`;
   $("#log").innerHTML=S.logs.map(l=>`<div><time>${clock(l.t)}</time><b>${esc(l.msg)}</b></div>`).join("")||`<div>Noch nichts passiert.</div>`;
@@ -364,6 +375,9 @@ function renderMoney(){
   $("#rank").innerHTML=`<tr><th>Streamer</th><th class="num">Clips</th><th class="num">Ø Note</th><th class="num">Gepostet</th><th class="num">Views</th><th class="num">€/1000</th><th class="num">€/Clip</th><th class="num">€</th></tr>`+
     (m.table.map(r=>`<tr><td><b>${esc(r.streamer)}</b></td><td class="num">${r.clips}</td><td class="num">${r.avg_score}</td><td class="num">${r.posted}</td><td class="num">${num(r.views)}</td><td class="num">${r.cpm.toFixed(2)}</td><td class="num">${eur(r.eur_per_clip)}</td><td class="num"><b>${eur(r.eur)}</b></td></tr>`).join("")
      ||`<tr><td colspan="8" style="color:var(--mute)">Noch keine Daten. Trag bei geposteten Clips die Views ein.</td></tr>`);
+  $("#learn").innerHTML=`<tr><th>Clip-Art</th><th class="num">Posts</th><th class="num">typ. Views</th><th class="num">Faktor</th></tr>`+
+    ((S.learning||[]).map(r=>`<tr><td>${CAT[r.category]||esc(r.category)}</td><td class="num">${r.posts}</td><td class="num">${num(r.median_views)}</td><td class="num" style="color:${r.factor>1?"var(--ok)":r.factor<1?"var(--bad)":"inherit"}">×${r.factor.toFixed(2)}</td></tr>`).join("")
+     ||`<tr><td colspan="4" style="color:var(--mute)">Noch keine Daten.</td></tr>`);
   const ready=S.clips.filter(c=>c.status==="RENDERED"||c.status==="DELIVERED").sort((a,b)=>(b.score??b.pre_score)-(a.score??a.pre_score));
   const hours={1:[18],2:[13,19],3:[12,17,20],4:[11,15,18,21],5:[10,13,16,19,21],6:[9,12,15,17,19,21]}[Math.min(6,Math.max(1,S.posts_per_day))]||[12,18];
   const slots=[];const now=new Date();
@@ -446,11 +460,11 @@ $("#demoBtn").onclick=async e=>{
   e.target.disabled=false;e.target.textContent="Testclip erzeugen";
 };
 
-const NUM=["default_cpm","posts_per_day","z_threshold","min_unique_users","clip_calls","pre_seconds","post_seconds","min_score","cooldown_seconds","buffer_minutes","keep_clips_days"];
+const NUM=["audio_z_threshold","default_cpm","posts_per_day","z_threshold","min_unique_users","clip_calls","pre_seconds","post_seconds","min_score","cooldown_seconds","buffer_minutes","keep_clips_days"];
 async function loadSettings(){
   const c=await (await fetch("/api/settings")).json(), f=$("#form");
   f.streamers.value=c.streamers.map(s=>`${s.login} ${s.lang||"de"}${s.cpm!=null?" "+s.cpm:""}`).join("\n");
-  f.progress_bar.checked=!!c.progress_bar;
+  f.progress_bar.checked=!!c.progress_bar;f.audio_detection.checked=!!c.audio_detection;f.learn_from_views.checked=!!c.learn_from_views;
   ["category_filter","quality","whisper_model","telegram_token","telegram_chat_id","ollama_model","ollama_url",...NUM].forEach(k=>f[k].value=c[k]??"");
   f.subtitles.checked=!!c.subtitles; f.lan_access.checked=!!c.lan_access;
   $("#lanUrl").textContent=c.lan_access?`Auf dem iPad öffnen: ${c._lan_url}`:`Nach dem Einschalten und Neustart: ${c._lan_url}`;
@@ -460,7 +474,7 @@ $("#form").onsubmit=async e=>{
   const old=await (await fetch("/api/settings")).json();
   const facecams=Object.fromEntries(old.streamers.map(s=>[s.login,s.facecam]));
   const streamers=f.streamers.value.split(/\n/).map(l=>l.trim().split(/[\s,;]+/)).filter(p=>p[0]).map(([login,lang,cpm])=>({login:login.toLowerCase(),lang:lang||"de",cpm:cpm?parseFloat(cpm.replace(",",".")):null,facecam:facecams[login.toLowerCase()]||null}));
-  const body={streamers,subtitles:f.subtitles.checked,lan_access:f.lan_access.checked,progress_bar:f.progress_bar.checked};
+  const body={streamers,subtitles:f.subtitles.checked,lan_access:f.lan_access.checked,progress_bar:f.progress_bar.checked,audio_detection:f.audio_detection.checked,learn_from_views:f.learn_from_views.checked};
   ["category_filter","quality","whisper_model","telegram_token","telegram_chat_id","ollama_model","ollama_url"].forEach(k=>body[k]=f[k].value.trim());
   NUM.forEach(k=>body[k]=Number(f[k].value));
   await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
