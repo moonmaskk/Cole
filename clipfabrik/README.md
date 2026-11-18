@@ -18,6 +18,15 @@ Danach öffnet sich das Dashboard im Browser. Drück **„Testclip erzeugen“**
 4. **Schneiden:** 9:16 mit unscharfem Hintergrund (oder Facecam oben/Gameplay unten), Hook, Quellenangabe, einheitliche Lautstärke, optional Wort-für-Wort-Untertitel.
 5. **Liefern:** im Dashboard (Vorschau, Text kopieren, Download) und optional per Telegram mit Buttons „gepostet / verwerfen / neu rendern“.
 
+## Feature-Paket „Mehr Geld“
+- **Verdienst-Tab:** Views bei geposteten Clips eintragen → Verdienst (Views × €/1000 der Kampagne), Ranking „Welcher Streamer lohnt sich?“, Hochrechnung ab 5 Posts (Median, keine Garantie).
+- **€/1000 pro Streamer:** in den Einstellungen hinter den Namen schreiben, z. B. `papaplatte de 1.5`.
+- **Facecam-Editor:** in der Streamer-Kachel auf „Cam“ tippen, Rechteck um die Kamera ziehen → Gesicht oben, Gameplay unten.
+- **Clip-Trimmer:** im Clip-Fenster Start/Ende um bis zu ±15 s verschieben und neu rendern.
+- **Fortschrittsbalken** im Video und **wechselnde Hooks** (Deutsch/Englisch) für mehr Zuschauzeit.
+- **Posting-Plan:** beste Clips zuerst, verteilt auf die Hauptzeiten (Posts pro Tag einstellbar).
+- **KI-Bewertung (optional, kostenlos):** [Ollama](https://ollama.com) installieren, `ollama pull llava`, Modellname in den Einstellungen eintragen. Die KI sortiert Langeweile/Cutscenes aus und schreibt bessere Hooks.
+
 ## 16 Streamer – geht das?
 Ja. Die Aufnahme kostet kaum Rechenleistung, entscheidend ist die **Internetleitung**:
 

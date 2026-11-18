@@ -95,9 +95,36 @@ dialog::backdrop{background:rgba(0,0,0,.75);backdrop-filter:blur(4px)}
 .modal video{height:min(78vh,720px);aspect-ratio:9/16;background:#000;border-radius:12px;display:block}
 .modal pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;margin:10px 0}
 .modal .acts{padding:0}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.kpi b{display:block;font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--mute);font-size:12px}.kpi.hi{border-color:rgba(47,210,122,.45)}.kpi.hi b{color:var(--ok)}
+table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.t th,.t td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:13px}
+.t th{color:var(--mute);font-weight:600;font-size:12px}.t tr:last-child td{border-bottom:0}
+.t td.num,.t th.num{text-align:right}
+.plan{display:flex;flex-direction:column;gap:8px}
+.slot{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;cursor:pointer}
+.slot img{width:40px;height:71px;object-fit:cover;border-radius:7px;background:#000}
+.slot time{font-weight:800;font-size:15px;min-width:92px;font-variant-numeric:tabular-nums}
+.slot .x{flex:1;min-width:0}.slot .x b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .x span{color:var(--mute);font-size:12px}
+.st .fc{position:absolute;top:10px;right:10px;border:1px solid var(--line);background:var(--panel2);border-radius:7px;font-size:11px;padding:3px 7px;cursor:pointer;color:var(--mute)}
+.st .fc.on{color:var(--ok);border-color:rgba(47,210,122,.45)}
+.fcwrap{position:relative;display:inline-block;max-width:100%;user-select:none;touch-action:none;cursor:crosshair}
+.fcwrap img{display:block;max-width:min(86vw,900px);border-radius:10px}
+.fcbox{position:absolute;border:3px solid var(--ok);background:rgba(47,210,122,.15);border-radius:4px;pointer-events:none}
+.trim{display:grid;grid-template-columns:auto 1fr auto;gap:8px 10px;align-items:center;font-size:12.5px;color:var(--mute);margin-top:10px}
+.trim input{padding:0}
+.trim output{font-variant-numeric:tabular-nums;color:var(--text);min-width:44px;text-align:right}
+.sub{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.sub h4{margin:0 0 8px;font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.07em}
+.row2{display:flex;gap:8px}.row2 input,.row2 select{flex:1;min-width:0}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:900px){.cols{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,1fr)}
   .modal{grid-template-columns:1fr}.modal video{height:auto;width:100%;max-height:62vh}}
-@media (max-width:560px){header{flex-wrap:wrap;padding:12px 16px}nav{order:3;width:100%;margin:0}nav button{flex:1}
+.cols>div{min-width:0}
+@media (max-width:560px){header{flex-wrap:wrap;padding:12px 16px}nav{order:3;width:100%;margin:0}nav button{flex:1;padding:7px 4px;font-size:13px}.slot time{min-width:70px;font-size:13px}
   main{padding:16px}.two,.three{grid-template-columns:1fr}.grid{grid-template-columns:1fr 1fr}.clips{grid-template-columns:1fr 1fr}
   #chatPill{display:none}}
 </style>
@@ -108,10 +135,12 @@ dialog::backdrop{background:rgba(0,0,0,.75);backdrop-filter:blur(4px)}
   <nav>
     <button data-v="dash" class="on">Übersicht</button>
     <button data-v="clips">Clips</button>
+    <button data-v="money">Verdienst</button>
     <button data-v="settings">Einstellungen</button>
   </nav>
   <div class="sp"></div>
   <span class="pill" id="chatPill"><span class="dot" id="chatDot"></span><span id="chatTxt">Chat</span></span>
+  <span class="pill" id="eurPill" title="eingetragener Verdienst (geschätzt)">€ 0,00</span>
   <span class="pill"><span class="dot live" id="liveDot"></span><span id="liveTxt">0 live</span></span>
 </header>
 
@@ -142,13 +171,30 @@ dialog::backdrop{background:rgba(0,0,0,.75);backdrop-filter:blur(4px)}
     <div class="clips" id="all"></div>
   </section>
 
+  <section id="v-money" hidden>
+    <h2>Verdienst</h2>
+    <div class="kpis" id="kpis"></div>
+    <div class="hint" style="margin-top:8px">Geschätzt aus den Views, die du bei geposteten Clips einträgst, mal € pro 1.000 Views der Kampagne. Hochrechnung = typischer Clip (Median) × Posts pro Tag × 30. Keine Garantie: echte Auszahlungen hängen von Kampagne und Plattform ab.</div>
+    <div class="cols" style="margin-top:6px">
+      <div>
+        <h2>Welcher Streamer lohnt sich?</h2>
+        <div style="overflow:auto"><table class="t" id="rank"></table></div>
+      </div>
+      <div>
+        <h2>Posting-Plan</h2>
+        <div class="plan" id="plan"></div>
+        <div class="hint" style="margin-top:8px">Beste Clips zuerst, verteilt auf die Hauptzeiten. Anzahl pro Tag in den Einstellungen.</div>
+      </div>
+    </div>
+  </section>
+
   <section id="v-settings" hidden>
     <form id="form" autocomplete="off">
       <div class="card">
         <h3>Streamer</h3>
-        <p>Ein Streamer pro Zeile: <code>login sprache</code>. Bis 16 sind auf einem normalen PC kein Problem.
+        <p>Ein Streamer pro Zeile: <code>login sprache €/1000</code> (Satz der Clipping-Kampagne, optional). Bis 16 sind auf einem normalen PC kein Problem.
           Clippe nur Streamer, die Clipping erlauben.</p>
-        <textarea name="streamers" placeholder="papaplatte de&#10;xqc en&#10;kaicenat en"></textarea>
+        <textarea name="streamers" placeholder="papaplatte de 1.5&#10;xqc en 2&#10;kaicenat en"></textarea>
         <div class="two">
           <div><label>Nur aufnehmen bei Kategorie (leer = alles)</label><input name="category_filter" placeholder="Grand Theft Auto"></div>
           <div><label>Qualität (Reihenfolge)</label><input name="quality"></div>
@@ -167,6 +213,24 @@ dialog::backdrop{background:rgba(0,0,0,.75);backdrop-filter:blur(4px)}
           <div><label>Abklingzeit (s)</label><input name="cooldown_seconds" type="number"></div>
           <div><label>Puffer (Minuten)</label><input name="buffer_minutes" type="number"></div>
           <div><label>Clips behalten (Tage)</label><input name="keep_clips_days" type="number"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Geld &amp; Wirkung</h3>
+        <p>Fortschrittsbalken und Hooks halten Zuschauer länger im Video, das bringt mehr Views.</p>
+        <div class="three">
+          <div><label>Standard €/1000 Views</label><input name="default_cpm" type="number" step="0.1"></div>
+          <div><label>Posts pro Tag</label><input name="posts_per_day" type="number"></div>
+          <div></div>
+        </div>
+        <label class="check"><input type="checkbox" name="progress_bar"> Fortschrittsbalken im Clip</label>
+      </div>
+      <div class="card">
+        <h3>KI-Bewertung (optional, kostenlos)</h3>
+        <p>Eine KI auf deinem PC schaut jeden Clip an, sortiert Langeweile und Cutscenes aus und schreibt einen besseren Hook. Dafür <b>Ollama</b> installieren (ollama.com) und z. B. <code>ollama pull llava</code> ausführen. Leer lassen = aus.</p>
+        <div class="two">
+          <div><label>Modell</label><input name="ollama_model" placeholder="llava"></div>
+          <div><label>Adresse</label><input name="ollama_url"></div>
         </div>
       </div>
       <div class="card">
@@ -211,8 +275,29 @@ dialog::backdrop{background:rgba(0,0,0,.75);backdrop-filter:blur(4px)}
       <button class="btn" data-a="rerender">Neu rendern</button>
       <button class="btn" data-a="reject">Verwerfen</button>
     </div>
+    <div class="sub"><h4>Gepostet? Views eintragen</h4>
+      <div class="row2"><input id="mViews" type="number" min="0" placeholder="Views">
+        <select id="mPlat"><option>TikTok</option><option>YouTube</option><option>Instagram</option><option>Andere</option></select>
+        <button class="btn p" id="mStats" style="flex:none">Speichern</button></div>
+      <div class="hint" id="mEur"></div>
+    </div>
+    <div class="sub"><h4>Schnitt anpassen</h4>
+      <div class="trim">
+        <span>Start</span><input type="range" id="tS" min="-15" max="15" step="1" value="0"><output id="tSo">0 s</output>
+        <span>Ende</span><input type="range" id="tE" min="-15" max="15" step="1" value="0"><output id="tEo">0 s</output>
+      </div>
+      <div class="hint">Minus = früher, Plus = später. Danach wird neu gerendert.</div>
+      <button class="btn" id="tGo" style="margin-top:8px;width:100%">Schnitt anwenden</button>
+    </div>
     <div style="margin-top:14px"><button class="btn" onclick="dlg.close()">Schließen</button></div>
   </div>
+</div></dialog>
+<dialog id="fcd"><div class="modal" style="grid-template-columns:1fr">
+  <div><h3 style="margin:0 0 4px">Facecam markieren: <span id="fcName"></span></h3>
+  <div class="hint" style="margin-bottom:10px">Zieh mit der Maus oder dem Finger ein Rechteck um die Kamera. Danach: Gesicht oben, Gameplay unten.</div>
+  <div class="fcwrap" id="fcWrap"><img id="fcImg" alt="" draggable="false"><div class="fcbox" id="fcBox" hidden></div></div>
+  <div class="hint" id="fcMsg"></div>
+  <div class="acts" style="padding:12px 0 0"><button class="btn p" id="fcSave">Speichern</button><button class="btn" id="fcDel">Ohne Facecam</button><button class="btn" onclick="fcd.close()">Abbrechen</button></div></div>
 </div></dialog>
 <div class="toast" id="toast"></div>
 
@@ -227,7 +312,7 @@ function clock(t){return new Date(t*1000).toLocaleTimeString("de-DE",{hour:"2-di
 
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b));
-  ["dash","clips","settings"].forEach(v=>$("#v-"+v).hidden=v!==b.dataset.v);
+  ["dash","clips","money","settings"].forEach(v=>$("#v-"+v).hidden=v!==b.dataset.v);
   if(b.dataset.v==="settings")loadSettings();
 });
 
@@ -257,16 +342,36 @@ function render(){
     ["Gesendet",sum("DELIVERED")],["Gepostet",sum("POSTED")],["Verworfen",sum("REJECTED","FAILED")]]
     .map(([l,n])=>`<div class="step"><b>${n}</b><span>${l}</span></div>`).join("");
   $("#grid").innerHTML=names.length?names.map(n=>{const s=st[n],z=Math.max(0,Math.min(100,(s.z||0)*12));
-    return `<div class="st ${s.recording?"rec":""}"><div class="n"><span class="badge ${s.live?"live":""}">${s.live?"LIVE":"OFF"}</span>${esc(n)}</div>
+    return `<div class="st ${s.recording?"rec":""}"><button class="fc ${S.facecams[n]?"on":""}" data-fc="${esc(n)}">${S.facecams[n]?"Cam ✓":"Cam"}</button><div class="n"><span class="badge ${s.live?"live":""}">${s.live?"LIVE":"OFF"}</span>${esc(n)}</div>
       <div class="c">${esc(s.category||s.status)}</div><div class="meter"><i style="width:${z}%"></i></div>
       <div class="row"><span>${s.rate||0} Nachr./min</span><span>z ${(s.z||0).toFixed(1)} · ${s.clips||0} Clips</span></div></div>`}).join("")
     :`<div class="empty">Noch keine Streamer. Trag sie unter <b>Einstellungen</b> ein oder erzeuge rechts einen Testclip.</div>`;
   $("#recent").innerHTML=S.clips.slice(0,8).map(clipCard).join("")||`<div class="empty">Noch keine Clips. Sobald ein Chat ausschlägt, erscheinen sie hier.</div>`;
   $("#log").innerHTML=S.logs.map(l=>`<div><time>${clock(l.t)}</time><b>${esc(l.msg)}</b></div>`).join("")||`<div>Noch nichts passiert.</div>`;
+  renderMoney();
   const groups={alle:S.clips,fertig:S.clips.filter(c=>["RENDERED","DELIVERED"].includes(c.status)),gepostet:S.clips.filter(c=>c.status==="POSTED"),
     "in Arbeit":S.clips.filter(c=>["NEW","CUT","JUDGED"].includes(c.status)),verworfen:S.clips.filter(c=>["REJECTED","FAILED"].includes(c.status))};
   $("#filters").innerHTML=Object.keys(groups).map(g=>`<button class="btn" style="flex:none;${g===filter?"background:var(--accent);border-color:var(--accent);color:#fff":""}" data-f="${g}">${g} · ${groups[g].length}</button>`).join("");
   $("#all").innerHTML=groups[filter].map(clipCard).join("")||`<div class="empty">Hier ist gerade nichts.</div>`;
+}
+
+const eur=v=>(+v||0).toLocaleString("de-DE",{style:"currency",currency:"EUR"});
+const num=v=>(+v||0).toLocaleString("de-DE");
+function renderMoney(){
+  const m=S.money; $("#eurPill").textContent=eur(m.eur);
+  $("#kpis").innerHTML=[["Verdienst",eur(m.eur),"hi"],["Views",num(m.views)],["Gepostet",m.posted],["Ø Views/Clip",num(m.avg_views)],
+    [m.month_estimate!=null?"Hochrechnung/Monat":"Hochrechnung ab 5 Posts",m.month_estimate!=null?eur(m.month_estimate):`${m.posted}/5`]].map(([l,v,c])=>`<div class="kpi ${c||""}"><b>${v}</b><span>${l}</span></div>`).join("");
+  $("#rank").innerHTML=`<tr><th>Streamer</th><th class="num">Clips</th><th class="num">Ø Note</th><th class="num">Gepostet</th><th class="num">Views</th><th class="num">€/1000</th><th class="num">€/Clip</th><th class="num">€</th></tr>`+
+    (m.table.map(r=>`<tr><td><b>${esc(r.streamer)}</b></td><td class="num">${r.clips}</td><td class="num">${r.avg_score}</td><td class="num">${r.posted}</td><td class="num">${num(r.views)}</td><td class="num">${r.cpm.toFixed(2)}</td><td class="num">${eur(r.eur_per_clip)}</td><td class="num"><b>${eur(r.eur)}</b></td></tr>`).join("")
+     ||`<tr><td colspan="8" style="color:var(--mute)">Noch keine Daten. Trag bei geposteten Clips die Views ein.</td></tr>`);
+  const ready=S.clips.filter(c=>c.status==="RENDERED"||c.status==="DELIVERED").sort((a,b)=>(b.score??b.pre_score)-(a.score??a.pre_score));
+  const hours={1:[18],2:[13,19],3:[12,17,20],4:[11,15,18,21],5:[10,13,16,19,21],6:[9,12,15,17,19,21]}[Math.min(6,Math.max(1,S.posts_per_day))]||[12,18];
+  const slots=[];const now=new Date();
+  for(let d=0;slots.length<ready.length&&d<30;d++)for(const h of hours){const t=new Date(now);t.setDate(now.getDate()+d);t.setHours(h,0,0,0);if(t>now&&slots.length<ready.length)slots.push(t)}
+  $("#plan").innerHTML=ready.map((c,i)=>{const t=slots[i],today=t.toDateString()===now.toDateString();
+    return `<div class="slot" data-open="${c.id}"><img src="/thumb/${c.id}.jpg?${c.updated|0}" alt=""><time>${today?"Heute":t.toLocaleDateString("de-DE",{weekday:"short"})} ${t.getHours()}:00</time>
+      <div class="x"><b>${esc(c.streamer)} · ${esc(c.title)}</b><span>Note ${c.score??c.pre_score}</span></div></div>`}).join("")
+    ||`<div class="empty">Keine fertigen Clips in der Warteschlange.</div>`;
 }
 
 async function poll(){
@@ -292,10 +397,47 @@ function openClip(id){
   $("#vid").src=`/media/${id}.mp4?${c.updated|0}`; $("#mDl").href=$("#vid").src; $("#mDl").download=`${c.streamer}-${id}.mp4`;
   $("#mTitle").textContent=`${c.streamer} · ${c.title}`; $("#mSub").textContent=`Note ${c.score??c.pre_score} · ${ago(c.created)}`;
   $("#mStatus").textContent=LABEL[c.status]; $("#mStatus").className=`badge s s-${c.status}`; $("#mText").textContent=c.text;
+  $("#mViews").value=c.views||""; if(c.platform)$("#mPlat").value=c.platform;
+  $("#mEur").textContent=c.views?`≈ ${eur(c.views/1000*(S.money.table.find(r=>r.streamer===c.streamer)?.cpm??1))} geschätzt`:"";
+  $("#tS").value=0;$("#tE").value=0;$("#tSo").textContent="0 s";$("#tEo").textContent="0 s";
   dlg.showModal(); $("#vid").play().catch(()=>{});
 }
 dlg.addEventListener("close",()=>{$("#vid").pause()});
 $("#mCopy").onclick=async()=>{try{await navigator.clipboard.writeText($("#mText").textContent);toast("Text kopiert")}catch{toast("Kopieren nicht erlaubt")}};
+
+$("#mStats").onclick=async()=>{
+  const r=await (await fetch(`/api/clip/${openId}/stats`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({views:+$("#mViews").value||0,platform:$("#mPlat").value})})).json();
+  toast(r.ok?"Views gespeichert":"Fehler");
+};
+["tS","tE"].forEach(id=>$("#"+id).oninput=e=>$("#"+id+"o").textContent=(e.target.value>0?"+":"")+e.target.value+" s");
+$("#tGo").onclick=async()=>{
+  const r=await (await fetch(`/api/clip/${openId}/trim`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({start:+$("#tS").value,end:+$("#tE").value})})).json();
+  toast(r.ok?"Wird mit neuem Schnitt gerendert":"Geht nicht: Clip zu kurz oder Rohschnitt schon gelöscht");
+  if(r.ok)dlg.close();
+};
+
+// Facecam-Editor
+let fcLogin=null,fcSel=null,fcStart=null;
+document.addEventListener("click",e=>{const b=e.target.closest("[data-fc]");if(b){e.stopPropagation();openFc(b.dataset.fc)}},true);
+function openFc(login){
+  fcLogin=login;fcSel=null;$("#fcBox").hidden=true;$("#fcName").textContent=login;$("#fcMsg").textContent="Lade aktuelles Bild …";
+  const img=$("#fcImg");img.onload=()=>$("#fcMsg").textContent="";img.onerror=()=>$("#fcMsg").textContent="Noch kein Bild. Der Streamer muss live sein (oder es gibt schon einen Clip von ihm).";
+  img.src=`/api/frame/${login}.jpg?${Date.now()}`;fcd.showModal();
+}
+const fcPos=e=>{const r=$("#fcImg").getBoundingClientRect();return[Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))]};
+$("#fcWrap").addEventListener("pointerdown",e=>{e.preventDefault();fcStart=fcPos(e);$("#fcWrap").setPointerCapture(e.pointerId)});
+$("#fcWrap").addEventListener("pointermove",e=>{if(!fcStart)return;const[p,q]=fcPos(e),[a,b]=fcStart;
+  fcSel={x:Math.min(a,p),y:Math.min(b,q),w:Math.abs(p-a),h:Math.abs(q-b)};const bx=$("#fcBox");bx.hidden=false;
+  Object.assign(bx.style,{left:fcSel.x*100+"%",top:fcSel.y*100+"%",width:fcSel.w*100+"%",height:fcSel.h*100+"%"})});
+$("#fcWrap").addEventListener("pointerup",()=>fcStart=null);
+async function saveFc(box){
+  const r=await (await fetch(`/api/facecam/${fcLogin}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({box})})).json();
+  toast(r.ok?(box?"Facecam gespeichert – gilt für neue Clips":"Facecam entfernt"):"Streamer nicht gefunden");fcd.close();
+}
+$("#fcSave").onclick=()=>{if(!fcSel||fcSel.w<.03||fcSel.h<.03)return $("#fcMsg").textContent="Bitte zuerst ein Rechteck ziehen.";saveFc(fcSel)};
+$("#fcDel").onclick=()=>saveFc(null);
 
 $("#demoBtn").onclick=async e=>{
   e.target.disabled=true;e.target.textContent="Erzeuge …";
@@ -304,11 +446,12 @@ $("#demoBtn").onclick=async e=>{
   e.target.disabled=false;e.target.textContent="Testclip erzeugen";
 };
 
-const NUM=["z_threshold","min_unique_users","clip_calls","pre_seconds","post_seconds","min_score","cooldown_seconds","buffer_minutes","keep_clips_days"];
+const NUM=["default_cpm","posts_per_day","z_threshold","min_unique_users","clip_calls","pre_seconds","post_seconds","min_score","cooldown_seconds","buffer_minutes","keep_clips_days"];
 async function loadSettings(){
   const c=await (await fetch("/api/settings")).json(), f=$("#form");
-  f.streamers.value=c.streamers.map(s=>`${s.login} ${s.lang||"de"}`).join("\n");
-  ["category_filter","quality","whisper_model","telegram_token","telegram_chat_id",...NUM].forEach(k=>f[k].value=c[k]??"");
+  f.streamers.value=c.streamers.map(s=>`${s.login} ${s.lang||"de"}${s.cpm!=null?" "+s.cpm:""}`).join("\n");
+  f.progress_bar.checked=!!c.progress_bar;
+  ["category_filter","quality","whisper_model","telegram_token","telegram_chat_id","ollama_model","ollama_url",...NUM].forEach(k=>f[k].value=c[k]??"");
   f.subtitles.checked=!!c.subtitles; f.lan_access.checked=!!c.lan_access;
   $("#lanUrl").textContent=c.lan_access?`Auf dem iPad öffnen: ${c._lan_url}`:`Nach dem Einschalten und Neustart: ${c._lan_url}`;
 }
@@ -316,9 +459,9 @@ $("#form").onsubmit=async e=>{
   e.preventDefault(); const f=e.target;
   const old=await (await fetch("/api/settings")).json();
   const facecams=Object.fromEntries(old.streamers.map(s=>[s.login,s.facecam]));
-  const streamers=f.streamers.value.split(/\n/).map(l=>l.trim().split(/[\s,;]+/)).filter(p=>p[0]).map(([login,lang])=>({login:login.toLowerCase(),lang:lang||"de",facecam:facecams[login.toLowerCase()]||null}));
-  const body={streamers,subtitles:f.subtitles.checked,lan_access:f.lan_access.checked};
-  ["category_filter","quality","whisper_model","telegram_token","telegram_chat_id"].forEach(k=>body[k]=f[k].value.trim());
+  const streamers=f.streamers.value.split(/\n/).map(l=>l.trim().split(/[\s,;]+/)).filter(p=>p[0]).map(([login,lang,cpm])=>({login:login.toLowerCase(),lang:lang||"de",cpm:cpm?parseFloat(cpm.replace(",",".")):null,facecam:facecams[login.toLowerCase()]||null}));
+  const body={streamers,subtitles:f.subtitles.checked,lan_access:f.lan_access.checked,progress_bar:f.progress_bar.checked};
+  ["category_filter","quality","whisper_model","telegram_token","telegram_chat_id","ollama_model","ollama_url"].forEach(k=>body[k]=f[k].value.trim());
   NUM.forEach(k=>body[k]=Number(f[k].value));
   await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   toast(`Gespeichert · ${streamers.length} Streamer`);

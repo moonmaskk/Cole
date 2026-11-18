@@ -49,7 +49,15 @@ def init() -> None:
         CREATE INDEX IF NOT EXISTS ix_status ON clips(status);
         """
     )
+    have = {r["name"] for r in conn().execute("PRAGMA table_info(clips)")}
+    for col, typ in (("views", "INTEGER DEFAULT 0"), ("platform", "TEXT DEFAULT ''"), ("posted_at", "REAL")):
+        if col not in have:
+            conn().execute(f"ALTER TABLE clips ADD COLUMN {col} {typ}")
     conn().commit()
+
+
+def all_clips() -> list[dict]:
+    return [dict(r) for r in conn().execute("SELECT * FROM clips ORDER BY created DESC").fetchall()]
 
 
 def add_clip(streamer: str, peak: float, start: float, end: float, pre_score: float,

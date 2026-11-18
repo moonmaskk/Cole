@@ -10,7 +10,7 @@ import traceback
 from collections import deque
 from pathlib import Path
 
-from . import config, db, media, telegram
+from . import ai, config, db, media, telegram
 from .chat import ChatClient
 from .detect import Detector
 from .recorder import Recorder
@@ -108,12 +108,12 @@ class Pipeline:
             if trig:
                 self.add_candidate(login, trig)
 
-    def add_candidate(self, login: str, trig) -> int | None:
+    def add_candidate(self, login: str, trig, dedupe: bool = True) -> int | None:
         c = self.cfg
         start, end = trig.peak - c["pre_seconds"], trig.peak + c["post_seconds"]
         if trig.score < 3:
             return None                                   # schwacher Vorab-Score fällt sofort weg
-        dup = db.overlapping(login, start, end)
+        dup = db.overlapping(login, start, end) if dedupe else None
         if dup:
             if dup["pre_score"] >= trig.score or dup["status"] != "NEW":
                 return None
@@ -147,9 +147,23 @@ class Pipeline:
         clip = db.next_with("CUT")
         if not clip:
             return
-        # v1: Bewertung aus den Chat-Signalen. Hook für lokale/Cloud-KI: judge_ai() unten.
+        s = self.streamer_cfg(clip["streamer"])
         score = clip["pre_score"]
-        title = make_title(clip)
+        title = make_title(clip, s.get("lang", "de"))
+        if self.cfg.get("ollama_model"):
+            try:
+                sig = json.loads(clip["signals"] or "{}")
+                v = ai.judge(self.cfg, clip, Path(clip["raw_path"]), sig.get("raw_offset", 0),
+                             self.clip_dir(clip["id"]), s.get("lang", "de"))
+                if v["hype"]:
+                    score = round(0.4 * clip["pre_score"] + 0.6 * v["hype"], 1)
+                title = v["hook"] or v["title"] or title
+                if not v["keep"]:
+                    db.update(clip["id"], status="REJECTED", score=score, title=title,
+                              error=f"KI: {v['reason'] or 'nicht stark genug'}")
+                    return
+            except Exception as e:
+                self.log(f"KI-Bewertung nicht erreichbar, nutze Chat-Note ({str(e)[:60]})")
         if score < self.cfg["min_score"]:
             db.update(clip["id"], status="REJECTED", score=score, title=title,
                       error=f"unter Mindestnote ({score} < {self.cfg['min_score']})")
@@ -166,7 +180,7 @@ class Pipeline:
         try:
             d = self.clip_dir(clip["id"])
             sig = json.loads(clip["signals"] or "{}")
-            s = next((x for x in self.cfg["streamers"] if x["login"] == clip["streamer"]), {})
+            s = self.streamer_cfg(clip["streamer"])
             duration = clip["end"] - clip["start"]
             out = d / "clip.mp4"
             words: list = []
@@ -178,7 +192,8 @@ class Pipeline:
                 except Exception as e:
                     self.log(f"Untertitel übersprungen: {e}")
             ass = media.build_ass(words, duration, f"twitch.tv/{clip['streamer']}", clip["title"])
-            media.render(Path(clip["raw_path"]), sig.get("raw_offset", 0), duration, out, s.get("facecam"), ass)
+            media.render(Path(clip["raw_path"]), sig.get("raw_offset", 0), duration, out, s.get("facecam"), ass,
+                         progress_bar=self.cfg.get("progress_bar", True))
             (d / "src.mp4").unlink(missing_ok=True)
             db.update(clip["id"], status="RENDERED", out_path=str(out), error="")
             self.log(f"Clip #{clip['id']} fertig ({clip['streamer']}, Note {clip['score']})")
@@ -217,12 +232,98 @@ class Pipeline:
             except Exception:
                 pass
 
+    def streamer_cfg(self, login: str) -> dict:
+        return next((x for x in self.cfg["streamers"] if x["login"] == login), {})
+
+    def cpm(self, login: str) -> float:
+        v = self.streamer_cfg(login).get("cpm")
+        return float(v if v is not None else self.cfg.get("default_cpm", 1.0))
+
+    def set_stats(self, cid: int, views: int, platform: str) -> bool:
+        clip = db.get(cid)
+        if not clip:
+            return False
+        db.update(cid, views=max(0, int(views)), platform=platform[:20], status="POSTED",
+                  posted_at=clip.get("posted_at") or time.time())
+        return True
+
+    def trim(self, cid: int, d_start: float, d_end: float) -> bool:
+        """Start/Ende verschieben (Sekunden) und neu rendern. Bleibt innerhalb des Rohschnitts."""
+        clip = db.get(cid)
+        if not clip or not clip["raw_path"] or not Path(clip["raw_path"]).exists():
+            return False
+        sig = json.loads(clip["signals"] or "{}")
+        off = sig.get("raw_offset", 0)
+        d_start = max(-off, d_start)
+        start, end = clip["start"] + d_start, clip["end"] + d_end
+        if end - start < 5:
+            return False
+        sig["raw_offset"] = off + d_start
+        db.update(cid, start=start, end=end, signals=json.dumps(sig), status="JUDGED",
+                  score=clip["score"] or clip["pre_score"])
+        return True
+
+    def set_facecam(self, login: str, box: dict | None) -> bool:
+        streamers = [dict(s) for s in self.cfg["streamers"]]
+        for s in streamers:
+            if s["login"] == login:
+                s["facecam"] = None if not box else {k: round(min(1, max(0, float(box[k]))), 4)
+                                                     for k in ("x", "y", "w", "h")}
+                self.set_cfg({"streamers": streamers})
+                return True
+        return False
+
+    def preview_frame(self, login: str) -> Path | None:
+        """Aktuelles Bild eines Streamers (aus dem Puffer, sonst aus dem letzten Clip)."""
+        out = config.DATA / f"frame-{login}.jpg"
+        segs = media.segments(config.BUFFER / login)
+        src = segs[-2][1] if len(segs) >= 2 else (segs[-1][1] if segs else None)
+        if src is None:
+            raws = sorted(config.CLIPS.glob("*/raw.ts"), key=lambda p: p.stat().st_mtime, reverse=True)
+            src = next((r for r in raws if (c := db.get(int(r.parent.name))) and c["streamer"] == login), None)
+        if src is None:
+            return None
+        media.frame(src, out, 0.5)
+        return out
+
+    def money(self) -> dict:
+        """Verdienst-Übersicht: geschätzt aus eingetragenen Views × € pro 1000 Views."""
+        rows: dict[str, dict] = {}
+        total_views = total_eur = posted = 0
+        for c in db.all_clips():
+            r = rows.setdefault(c["streamer"], {"streamer": c["streamer"], "clips": 0, "posted": 0, "views": 0,
+                                                "eur": 0.0, "score_sum": 0.0, "cpm": self.cpm(c["streamer"])})
+            r["clips"] += 1
+            r["score_sum"] += c["score"] or c["pre_score"] or 0
+            if c["status"] == "POSTED":
+                eur = (c["views"] or 0) / 1000 * r["cpm"]
+                r["posted"] += 1
+                r["views"] += c["views"] or 0
+                r["eur"] += eur
+                posted += 1
+                total_views += c["views"] or 0
+                total_eur += eur
+        table = []
+        for r in rows.values():
+            r["avg_score"] = round(r.pop("score_sum") / r["clips"], 1) if r["clips"] else 0
+            r["eur_per_clip"] = round(r["eur"] / r["posted"], 2) if r["posted"] else 0
+            r["eur"] = round(r["eur"], 2)
+            table.append(r)
+        table.sort(key=lambda r: (r["eur"], r["avg_score"]), reverse=True)
+        avg_views = total_views / posted if posted else 0
+        views_list = sorted(c["views"] or 0 for c in db.all_clips() if c["status"] == "POSTED")
+        median = views_list[len(views_list) // 2] if views_list else 0   # Ausreißer verzerren nicht
+        avg_cpm = (total_eur / total_views * 1000) if total_views else self.cfg.get("default_cpm", 1.0)
+        per_month = median / 1000 * avg_cpm * self.cfg.get("posts_per_day", 4) * 30 if posted >= 5 else None
+        return {"views": total_views, "eur": round(total_eur, 2), "posted": posted,
+                "avg_views": round(avg_views), "month_estimate": round(per_month, 2) if per_month is not None else None, "table": table}
+
     def action(self, cid: int, act: str) -> bool:
         clip = db.get(cid)
         if not clip:
             return False
         if act == "posted":
-            db.update(cid, status="POSTED")
+            db.update(cid, status="POSTED", posted_at=clip.get("posted_at") or time.time())
         elif act == "reject":
             db.update(cid, status="REJECTED", error="von dir verworfen")
         elif act == "rerender" and clip["raw_path"]:
@@ -249,6 +350,9 @@ class Pipeline:
             "counts": db.counts(),
             "clips": db.recent(60),
             "logs": list(self.logs)[:60],
+            "money": self.money(),
+            "facecams": {s["login"]: bool(s.get("facecam")) for s in self.cfg["streamers"]},
+            "posts_per_day": self.cfg.get("posts_per_day", 4),
             "uptime": time.time() - self.started,
             "now": time.time(),
         }
@@ -285,16 +389,32 @@ class Pipeline:
         if not trig:
             return None
         self.log("Demo: Testclip angelegt")
-        return self.add_candidate(login, trig)
+        return self.add_candidate(login, trig, dedupe=False)
 
 
-def make_title(clip: dict) -> str:
+HOOKS = {
+    "de": {
+        "calls": ["Chat schreit nur noch CLIP", "Das musste geclippt werden", "Chat hat sofort reagiert"],
+        "hype": ["Der Chat ist komplett eskaliert", "Damit hat keiner gerechnet", "Wie ist das passiert?!",
+                 "Warte aufs Ende", "Er hat es wirklich getan"],
+        "base": ["Dieser Moment …", "Achte genau hin", "Niemand war bereit dafür"],
+    },
+    "en": {
+        "calls": ["Chat spammed CLIP IT", "This had to be clipped", "Chat lost it instantly"],
+        "hype": ["Chat went absolutely crazy", "Nobody expected this", "Wait for the end",
+                 "He actually did it", "How did this happen?!"],
+        "base": ["This moment …", "Watch closely", "Nobody was ready"],
+    },
+}
+
+
+def make_title(clip: dict, lang: str = "de") -> str:
+    """Wechselnde Hooks je nach Signal und Sprache (gleicher Clip -> gleicher Hook)."""
     sig = json.loads(clip.get("signals") or "{}")
-    if sig.get("clip_calls", 0) >= 3:
-        return "Chat ruft CLIP IT 😳"
-    if sig.get("hype", 0) >= 5:
-        return "Der Chat eskaliert 💀"
-    return "Dieser Moment …"
+    lib = HOOKS.get(lang, HOOKS["en"])
+    kind = "calls" if sig.get("clip_calls", 0) >= 3 else "hype" if sig.get("hype", 0) >= 5 else "base"
+    options = lib[kind]
+    return options[(clip.get("id") or 0) % len(options)]
 
 
 def text_block(clip: dict, st: dict) -> str:

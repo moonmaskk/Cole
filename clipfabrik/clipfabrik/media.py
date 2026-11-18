@@ -147,8 +147,15 @@ def _model(name: str):
 
 # ---------- 9:16 ----------
 
-def layout_filter(facecam: dict | None, subs: bool) -> str:
+def frame(src: Path, out: Path, at: float = 1.0) -> None:
+    run(["-ss", f"{at:.2f}", "-i", str(src), "-frames:v", "1", "-vf", "scale=960:-2", str(out)])
+
+
+def layout_filter(facecam: dict | None, subs: bool, bar: float = 0.0) -> str:
     sub = ",subtitles=subs.ass" if subs else ""
+    if bar > 0:   # Fortschrittsbalken: läuft in der Clip-Dauer einmal von links nach rechts
+        sub += (f"[pre];color=c=0x9b6bff:s=1080x14:r=30[bar];"
+                f"[pre][bar]overlay=x='-w+w*t/{bar:.2f}':y=H-14:shortest=1")
     if facecam:
         x, y, w, h = (float(facecam[k]) for k in ("x", "y", "w", "h"))
         return (f"[0:v]split=2[a][b];"
@@ -164,7 +171,7 @@ def layout_filter(facecam: dict | None, subs: bool) -> str:
 
 
 def render(raw: Path, offset: float, duration: float, out: Path, facecam: dict | None,
-           ass_text: str | None) -> None:
+           ass_text: str | None, progress_bar: bool = False) -> None:
     work = out.parent
     clip_src = work / "src.mp4"
     # Erst genau zuschneiden, damit Whisper-Zeiten und Untertitel bei 0 beginnen
@@ -172,7 +179,8 @@ def render(raw: Path, offset: float, duration: float, out: Path, facecam: dict |
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-c:a", "aac", "-b:a", "192k", str(clip_src)])
     if ass_text:
         (work / "subs.ass").write_text(ass_text, "utf-8")
-    args = ["-i", "src.mp4", "-filter_complex", layout_filter(facecam, bool(ass_text)),
+    bar = duration if progress_bar else 0.0
+    args = ["-i", "src.mp4", "-filter_complex", layout_filter(facecam, bool(ass_text), bar),
             "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
             "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", "-movflags", "+faststart", out.name]
@@ -182,6 +190,6 @@ def render(raw: Path, offset: float, duration: float, out: Path, facecam: dict |
         if not ass_text:
             raise
         # Falls libass/Schriften fehlen: ohne Untertitel rendern statt abbrechen
-        args[3] = layout_filter(facecam, False)
+        args[3] = layout_filter(facecam, False, bar)
         run(args, cwd=work)
     run(["-ss", "1", "-i", out.name, "-frames:v", "1", "-vf", "scale=360:-2", "thumb.jpg"], cwd=work)

@@ -100,6 +100,15 @@ def make_handler(p: Pipeline):
                 self._json(cfg)
             elif m := re.fullmatch(r"/media/(\d+)\.mp4", path):
                 self._file(config.CLIPS / f"{int(m.group(1)):06d}" / "clip.mp4", "video/mp4")
+            elif m := re.fullmatch(r"/api/frame/([a-z0-9_]+)\.jpg", path):
+                try:
+                    f = p.preview_frame(m.group(1))
+                except Exception:
+                    f = None
+                if f:
+                    self._file(f, "image/jpeg")
+                else:
+                    self._json({"error": "noch kein Bild – Streamer muss live sein"}, 404)
             elif m := re.fullmatch(r"/thumb/(\d+)\.jpg", path):
                 self._file(config.CLIPS / f"{int(m.group(1)):06d}" / "thumb.jpg", "image/jpeg")
             else:
@@ -119,6 +128,14 @@ def make_handler(p: Pipeline):
                 self._json({"ok": True})
             elif m := re.fullmatch(r"/api/clip/(\d+)/(posted|reject|rerender)", path):
                 self._json({"ok": p.action(int(m.group(1)), m.group(2))})
+            elif m := re.fullmatch(r"/api/clip/(\d+)/stats", path):
+                self._json({"ok": p.set_stats(int(m.group(1)), int(data.get("views") or 0),
+                                              str(data.get("platform") or ""))})
+            elif m := re.fullmatch(r"/api/clip/(\d+)/trim", path):
+                self._json({"ok": p.trim(int(m.group(1)), float(data.get("start") or 0),
+                                         float(data.get("end") or 0))})
+            elif m := re.fullmatch(r"/api/facecam/([a-z0-9_]+)", path):
+                self._json({"ok": p.set_facecam(m.group(1), data.get("box"))})
             elif path == "/api/demo":
                 try:
                     cid = p.demo()

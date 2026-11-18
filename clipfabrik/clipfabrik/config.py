@@ -43,7 +43,13 @@ DEFAULTS: dict = {
     "telegram_token": "",
     "telegram_chat_id": "",
     "keep_clips_days": 7,
-    "lan_access": False,        # True: Dashboard auch auf iPad/Handy im WLAN
+    "lan_access": False,
+    # Geld & Qualität
+    "default_cpm": 1.0,         # € pro 1000 Views, wenn beim Streamer nichts steht (Kampagnen-Satz)
+    "posts_per_day": 4,
+    "progress_bar": True,       # Fortschrittsbalken im Clip (hält Zuschauer länger)
+    "ollama_model": "",         # z. B. "llava" oder "qwen2.5vl" -> KI-Bewertung lokal; leer = aus
+    "ollama_url": "http://127.0.0.1:11434",
     "port": 8765,
 }
 
@@ -87,5 +93,9 @@ def normalize_streamers(items) -> list[dict]:
         if not login or login in seen:
             continue
         seen.add(login)
-        out.append({"login": login, "lang": it.get("lang", "de"), "facecam": it.get("facecam")})
+        try:
+            cpm = float(it["cpm"]) if it.get("cpm") not in (None, "") else None
+        except (TypeError, ValueError):
+            cpm = None
+        out.append({"login": login, "lang": it.get("lang", "de"), "facecam": it.get("facecam"), "cpm": cpm})
     return out

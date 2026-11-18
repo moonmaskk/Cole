@@ -20,7 +20,9 @@ Ein Programm, das auf Windows per Doppelklick läuft, 16 Streamer parallel über
 - Im Cloud-Container ist Twitch gesperrt: dort nur Demo/Tests.
 - Windows-.exe baut GitHub Actions (`.github/workflows/clipfabrik-exe.yml`).
 
+`ai` optionale Ollama-Bewertung · Verdienst (`Pipeline.money`), Trim, Facecam-Editor, Posting-Plan sind im UI.
+
 ## Nächste Schritte
-1. KI-Bewertung (Ollama-Vision oder Cloud) in `Pipeline._judge_one` mit festem JSON (keep, hype, start_s, end_s, subject_x, hook).
-2. Facecam-Bereich pro Streamer im UI markieren (Feld `facecam` existiert schon).
-3. Kick/YouTube als weitere Quellen.
+1. Untertitel in der .exe (faster-whisper bündeln oder nachladen).
+2. Kick/YouTube als weitere Quellen.
+3. `subject_x` aus der KI nutzen, damit der Gameplay-Ausschnitt der Action folgt.

@@ -96,5 +96,34 @@ class PipelineDemoTest(unittest.TestCase):
         self.assertTrue(Path(clip["out_path"]).stat().st_size > 100_000)
 
 
+class FeaturePackTest(unittest.TestCase):
+    def test_ai_parse(self):
+        from clipfabrik.ai import parse
+        v = parse('Klar! {"keep": true, "hype": 8, "hook": "Damit rechnet keiner", "cutscene": false}')
+        self.assertTrue(v["keep"]); self.assertEqual(v["hype"], 8.0); self.assertEqual(v["hook"], "Damit rechnet keiner")
+        self.assertFalse(parse('{"keep": true, "hype": 9, "cutscene": true}')["keep"])
+
+    def test_money_trim_facecam(self):
+        from clipfabrik import db
+        from clipfabrik.pipeline import Pipeline
+        p = Pipeline()
+        p.set_cfg({"streamers": [{"login": "demo", "lang": "de", "cpm": 2.0}]})
+        cid = p.demo()
+        p._cut_one(); p._judge_one()
+        self.assertTrue(p.set_facecam("demo", {"x": 0.7, "y": 0.0, "w": 0.3, "h": 0.3}))
+        p._render_one()
+        self.assertEqual(db.get(cid)["status"], "RENDERED", db.get(cid)["error"])
+        self.assertTrue(p.trim(cid, -3, 2))
+        p._render_one()
+        c = db.get(cid)
+        self.assertEqual(c["status"], "RENDERED", c["error"])
+        self.assertTrue(35 < c["end"] - c["start"] <= 39)  # Start kann nicht vor den Rohschnitt
+        self.assertTrue(p.set_stats(cid, 25000, "TikTok"))
+        m = p.money()
+        row = next(r for r in m["table"] if r["streamer"] == "demo")
+        self.assertEqual(row["eur"], 50.0)
+        self.assertIsNotNone(p.preview_frame("demo"))
+
+
 if __name__ == "__main__":
     unittest.main()
