@@ -1,0 +1,5 @@
+# Gerenderte Medien (gross, jederzeit reproduzierbar per build.py)
+*.mp4
+*.srt
+*_vorschau.png
+__pycache__/
